@@ -1,14 +1,36 @@
 #### FH2T Table Creation ####
 
-# load libraries
-require(readxl)
-library(data.table) 
-require(plyr)
-require(dplyr)
-library(xts)
-library(lubridate)
+####Installing & Loading Packages###
+#create list of packages
+packages = c(
+  "tidyverse",
+  "plyr",
+  "ggExtra",
+  "xts",
+  "lubridate",
+  "readxl",
+  "data.table",
+  "RSQLite",
+  "DBI"
+)
+#load install
+package.check <- lapply(
+  packages,
+  FUN = function(x) {
+    if (!require(x, character.only = TRUE)) {
+      install.packages(x, dependencies = TRUE)
+      library(x, character.only = TRUE)
+    }
+  }
+) 
+rm(package.check, packages)
+
 ifnull <- function(x,y) ifelse(is.na(x), y, x)
 options(scipen = 100)
+
+
+### Connect to SQLite DB ####
+ies_research_con <- dbConnect(RSQLite::SQLite(), "ies_research schema/maple_ies_research.db")
 
 ### LOAD DATA ####
 # load original logs from David @ GM
@@ -24,23 +46,30 @@ ls(pattern = "data[1-9]+")
 
 # merge all log files
 logs<-do.call(rbind.fill, mget(ls(pattern = "data[1-9]+")))
-rm(list = setdiff(ls(), c("logs", "ifnull"))) # clean environment
+rm(list = setdiff(ls(), c("logs", "ifnull", "ies_research_con"))) # clean environment
 
 ## load assessment data
 assess <- read.csv("DATA20220202_4092 copy.csv")
 colnames(assess)
 
 # load crosswalk
-cross<- read.csv("ies_research schema/student_id_crosswalk.csv")
-
+#cross<- read.csv("ies_research schema/student_id_crosswalk.csv")
+cross<-dbGetQuery(ies_research_con, 
+                  "select * from student_id_crosswalk")
 
 # load FH2T problem metadata
 problems <- read.csv("FH2T_Efficacy_Masterlist/worlds 1-14 Sep30-Table 1.csv", na.strings = c(""))
     # cleaning problem files
 
+
 ###### SAVE "fh2t_raw_logs.csv FILE ######
 write.csv(logs, "ies_research schema/fh2t_raw_logs.csv")
 logs<-read.csv("ies_research schema/fh2t_raw_logs.csv")
+
+###### Write fh2t_raw_logs table ######
+if (dbExistsTable(ies_research_con, "fh2t_raw_logs"))
+  dbRemoveTable(ies_research_con, "fh2t_raw_logs")
+RSQLite::dbWriteTable(ies_research_con, "fh2t_raw_logs", logs, overwrite == T)
 
 #### Build fh2t_problems_meta ####
 colnames(problems)
@@ -74,9 +103,6 @@ fpm <- problems %>%
     instruction_text2,
     hint_text
   )
-
-
-
 
 
 # create flags for optional and tuuiral poblems
@@ -150,10 +176,14 @@ fpm$tutorial <- ifelse(fpm$problem_id %in% (tutorial), 1, 0)
 table(fpm$tutorial)
 
 
-###### SAVE "fh2t_student_action_logs.csv FILE #######
+###### SAVE "fh2t_problems_meta.csv FILE #######
 write.csv(fpm, "ies_research schema/fh2t_problems_meta.csv") 
 colnames(fpm)
-fpm<-read.csv("ies_research schema/fh2t_problems_meta.csv") 
+
+###### Write fh2t_problems_meta table ######
+if (dbExistsTable(ies_research_con, "fh2t_problems_meta"))
+  dbRemoveTable(ies_research_con, "fh2t_problems_meta")
+RSQLite::dbWriteTable(ies_research_con, "fh2t_problems_meta", fpm, overwrite == T)
 
 #### CHECK/CLEAN LOGS DATA ####
 colnames(logs)
@@ -188,8 +218,7 @@ length(unique(logs$user_id)) # There are more than I expected - maybe this inclu
   
   logs <- logs %>%
     inner_join(cross %>% 
-                 select("fh2t_user_id",
-                       "StuID"),
+                 dplyr::select(fh2t_user_id, StuID),
                by = c("user_id" = "fh2t_user_id"))
 
   length(unique(logs$user_id))  
@@ -213,7 +242,7 @@ table(logs$subtype, logs$type) # type doesn't seems as relevant
 logs_cln <- logs %>%
   filter(is.na(automatic ))%>%
   rename("world_id"= assignment_id,
-         "world_problem_num"= assignment_problem_id) 
+         "world_problem_num"= assignment_problem_id)  %>%
   select(X_id,
          StuID,
          canvas_id,
@@ -237,7 +266,13 @@ logs_cln <- logs %>%
 ###### SAVE "fh2t_student_action_logs.csv FILE #######
 write.csv(logs_cln, "ies_research schema/fh2t_student_action_logs.csv") 
 colnames(logs)
-logs_cln<-read.csv("ies_research schema/fh2t_student_action_logs.csv") 
+#logs_cln<-read.csv("ies_research schema/fh2t_student_action_logs.csv") 
+
+
+###### Write fh2t_student_action_logs table ######
+if (dbExistsTable(ies_research_con, "fh2t_student_action_logs"))
+  dbRemoveTable(ies_research_con, "fh2t_student_action_logs")
+RSQLite::dbWriteTable(ies_research_con, "fh2t_student_action_logs", logs_cln, overwrite == TRUE)
 
 #### Build fh2t_student_problem_attempt ####
 logs_cln <- logs_cln %>%
@@ -354,6 +389,10 @@ write.csv(spa %>%
             select(-resets_within_replay_attempt), "ies_research schema/fh2t_student_problem_attempt.csv") 
 
 
+###### Write fh2t_student_problem_attempt table ######
+if (dbExistsTable(ies_research_con, "fh2t_student_problem_attempt"))
+  dbRemoveTable(ies_research_con, "fh2t_student_problem_attempt")
+RSQLite::dbWriteTable(ies_research_con, "fh2t_student_problem_attempt", spa, overwrite == T)
 
 #### Build fh2t_student_problem ####
 
@@ -442,17 +481,12 @@ sp <- spa %>%
            "problem_id" = "final_problem_id")
   )
 
-  
 
-###### SAVE "fh2t_student_action_logs.csv FILE #######
-write.csv(spa %>%
-            select(-resets_within_replay_attempt), "ies_research schema/fh2t_student_problem.csv") 
+###### SAVE fh2t_student_problem.csv FILE #######
+write.csv(sp , "ies_research schema/fh2t_student_problem.csv") 
 
+###### Write fh2t_student_problem table ######
+if (dbExistsTable(ies_research_con, "fh2t_student_problem"))
+  dbRemoveTable(ies_research_con, "fh2t_student_problem")
+RSQLite::dbWriteTable(ies_research_con, "fh2t_student_problem", sp, overwrite == T)
 
-
-
-table(as_datetime(logs_cln$time) == logs_cln$timestamp)
-head(as.POSIXct(logs_cln$time, origin = "1970-01-01 00:00:00"))
-head(logs_cln$time)
-head(as_datetime(logs_cln$time))s
-head(as_datetime(logs_cln$timestamp))

@@ -1,15 +1,36 @@
 #### ADDING TO CROSSWALK ####
 
+####Installing & Loading Packages###
+#create list of packages
+packages = c(
+  "tidyverse",
+  "plyr",
+  "ggExtra",
+  "xts",
+  "lubridate",
+  "readxl",
+  "data.table",
+  "RSQLite",
+  "DBI"
+)
+#load install
+package.check <- lapply(
+  packages,
+  FUN = function(x) {
+    if (!require(x, character.only = TRUE)) {
+      install.packages(x, dependencies = TRUE)
+      library(x, character.only = TRUE)
+    }
+  }
+) 
+rm(package.check, packages)
 
-# load libraries
-require(readxl)
-library(data.table) 
-require(plyr)
-require(dplyr)
-library(xts)
-library(lubridate)
 ifnull <- function(x,y) ifelse(is.na(x), y, x)
 options(scipen = 100)
+
+
+### Connect to SQLite DB ####
+ies_research_con <- dbConnect(RSQLite::SQLite(), "ies_research schema/maple_ies_research.db")
 
 ### Load 
 cross <- read.csv("Crosswalk_CSVs_20220201/Students-Table 1.csv", na.strings = c("", " "))
@@ -64,8 +85,6 @@ table(is.na(FH2T$userID))
 # there are 501 students who were assigned to the FH2T Condition, who did not have any activity in FH2T
 
 
-
-
 # final cleaning before save
 
 cross <- cross %>%
@@ -77,5 +96,10 @@ cross <- cross %>%
   rename(fh2t_user_id = userID)
   
 
-### Save Crosswalk 
+### Save Crosswalk as csv
 write.csv(cross, "ies_research schema/student_id_crosswalk.csv")
+
+### Save crosswalk in maple_ies_research db
+
+RSQLite::dbWriteTable(ies_research_con, "student_id_crosswalk", cross)
+
