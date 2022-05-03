@@ -28,7 +28,7 @@ rm(package.check, packages)
 ifnull <- function(x,y) ifelse(is.na(x), y, x)
 options(scipen = 100)
 
-
+ 
 ### Connect to SQLite DB ####
 ies_research_con <- dbConnect(RSQLite::SQLite(), "ies_research schema/maple_ies_research.db")
 

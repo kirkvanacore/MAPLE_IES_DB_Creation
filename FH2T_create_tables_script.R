@@ -21,7 +21,7 @@ package.check <- lapply(
       install.packages(x, dependencies = TRUE)
       library(x, character.only = TRUE)
     }
-  }
+  } 
 ) 
 rm(package.check, packages)
 
