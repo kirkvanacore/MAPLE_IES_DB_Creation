@@ -25,6 +25,11 @@ package.check <- lapply(
 ) 
 rm(package.check, packages)
 
+colClean <- function(x){ colnames(x) <- sub(".", "_", colnames(x)); x } 
+
+
+
+
 ifnull <- function(x,y) ifelse(is.na(x), y, x)
 options(scipen = 100)
 
@@ -37,13 +42,17 @@ ies_research_con <- dbConnect(RSQLite::SQLite(), "ies_research schema/maple_ies_
 assess <- read.csv("DATA20220202_4092 copy.csv")
 colnames(assess)
 
+# get rid of '.' in colnames
+colnames(assess)<-sub('[.]', '_', colnames(assess))
+colnames(assess)
+
 
 ### Save Crosswalk as csv
 write.csv(assess, "ies_research schema/assess.csv")
 
 ### Save crosswalk in maple_ies_research db
 
-RSQLite::dbWriteTable(ies_research_con, "assess", assess)
+RSQLite::dbWriteTable(ies_research_con, "assess", assess, overwrite = T)
 
 #  Mabe in the fure I will clean this data set up a bit more, but for now i'm just saving this as an assess file
 # ### Create Student meta data
