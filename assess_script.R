@@ -12,7 +12,7 @@ packages = c(
   "data.table",
   "RSQLite",
   "DBI"
-)
+) 
 #load install
 package.check <- lapply(
   packages,

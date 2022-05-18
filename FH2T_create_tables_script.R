@@ -307,7 +307,7 @@ logs_cln <- logs_cln %>%
     #this offset will be used to create the end time when I aggregate all of the data at the action level
     time_offset = lag(time)) %>%
   dplyr::ungroup() %>%
-  dplyr::mutate(
+  dplyr::mutate( 
     # this creates a flag for when a student completed the problem 
     completed_flag = ifnull((ifelse(subtype == "complete", 1, 0)),0),
     step = ifelse(subtype == "rewrite", 1, 0),
