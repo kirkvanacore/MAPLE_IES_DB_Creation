@@ -69,18 +69,20 @@ cross<-dbGetQuery(ies_research_con,
                   "select * from student_id_crosswalk")
 
 # load FH2T problem metadata
-problems <- read.csv("FH2T_Efficacy_Masterlist/worlds 1-14 Sep30-Table 1.csv", na.strings = c(""))
+problems <- read.csv("problem list_IES_2020_final/FH2T-Table 1.csv", na.strings = c(""))
     # cleaning problem files
 
 
-# ###### SAVE "fh2t_raw_logs.csv FILE ######
-# write.csv(logs, "ies_research schema/fh2t_raw_logs.csv")
-# logs<-read.csv("ies_research schema/fh2t_raw_logs.csv")
-# 
-# ###### Write fh2t_raw_logs table ######
-# if (dbExistsTable(ies_research_con, "fh2t_raw_logs"))
-#   dbRemoveTable(ies_research_con, "fh2t_raw_logs")
-# RSQLite::dbWriteTable(ies_research_con, "fh2t_raw_logs", logs, overwrite == T)
+###### SAVE "fh2t_raw_logs.csv FILE ######
+write.csv(logs, "ies_research schema/fh2t_raw_logs.csv")
+logs<-read.csv("ies_research schema/fh2t_raw_logs.csv")
+
+###### Write fh2t_raw_logs table ######
+if (dbExistsTable(ies_research_con, "fh2t_raw_logs"))
+  dbRemoveTable(ies_research_con, "fh2t_raw_logs")
+RSQLite::dbWriteTable(ies_research_con, "fh2t_raw_logs", logs, overwrite == T)
+
+
 
 #### Build fh2t_problems_meta ####
 colnames(problems)
@@ -92,19 +94,20 @@ table(problems$New.Video)
 table(problems$ID)
 table(problems$problem)
 
+# using new_bestStep.updated_0207_2020. as optimal step <- conformed with David at GM that this was used in study
+colnames(problems)
+table(problems$ID)
 
 fpm <- problems %>%
-  filter(is.na(Video) == T | Video != "39") %>%
-  mutate(video = ifelse(Video == "YES", 1, 0)) %>%
   dplyr::rename("problem_id" = ID,
          "world_id" = worldID,
-         "world_problem_num" = worldProblem,
-        "start_state"  = problem,
-        "answer_state" = answer,
-        "optimal_step" = bestStep,
-        "instruction_text1"=instructionText,
-        "instruction_text2"=instructionText2,
-        "hint_text"=hintText
+         "world_problem_num" = world.Problem,
+        "start_state"  = Start.State,
+        "answer_state" = Goal.State,
+        "optimal_steps" = best.Step,
+        "instruction_text"=instructionText,
+        "hint_text"=hintText,
+        "reward_text"= rewardText
         ) %>%
   select(
     problem_id,
@@ -112,9 +115,8 @@ fpm <- problems %>%
     world_problem_num,
     start_state,
     answer_state,
-    optimal_step,
-    instruction_text1,
-    instruction_text2,
+    optimal_steps,
+    instruction_text,
     hint_text
   )
 
@@ -189,15 +191,14 @@ fpm$tutorial <- ifelse(fpm$problem_id %in% (tutorial), 1, 0)
 
 table(fpm$tutorial)
 
+###### SAVE "fh2t_problems_meta.csv FILE #######
+write.csv(fpm, "ies_research schema/fh2t_problems_meta.csv")
+colnames(fpm)
 
-# ###### SAVE "fh2t_problems_meta.csv FILE #######
-# write.csv(fpm, "ies_research schema/fh2t_problems_meta.csv") 
-# colnames(fpm)
-# 
-# ###### Write fh2t_problems_meta table ######
-# if (dbExistsTable(ies_research_con, "fh2t_problems_meta"))
-#   dbRemoveTable(ies_research_con, "fh2t_problems_meta")
-# RSQLite::dbWriteTable(ies_research_con, "fh2t_problems_meta", fpm, overwrite == T)
+###### Write fh2t_problems_meta table ######
+if (dbExistsTable(ies_research_con, "fh2t_problems_meta"))
+  dbRemoveTable(ies_research_con, "fh2t_problems_meta")
+RSQLite::dbWriteTable(ies_research_con, "fh2t_problems_meta", fpm, overwrite = T)
 
 #### CHECK/CLEAN LOGS DATA ####
 colnames(logs)
@@ -277,24 +278,24 @@ logs_cln <- logs %>%
          action) %>%
   arrange(StuID, time) 
 
-# ###### SAVE "fh2t_student_action_logs.csv FILE #######
-# write.csv(logs_cln, "ies_research schema/fh2t_student_action_logs.csv") 
-# colnames(logs)
-# #logs_cln<-read.csv("ies_research schema/fh2t_student_action_logs.csv") 
-# 
-# 
-# ###### Write fh2t_student_action_logs table ######
-# if (dbExistsTable(ies_research_con, "fh2t_student_action_logs"))
-#   dbRemoveTable(ies_research_con, "fh2t_student_action_logs")
-# RSQLite::dbWriteTable(ies_research_con, "fh2t_student_action_logs", logs_cln, overwrite == TRUE)
+###### SAVE "fh2t_student_action_logs.csv FILE #######
+write.csv(logs_cln, "ies_research schema/fh2t_student_action_logs.csv")
+colnames(logs)
+#logs_cln<-read.csv("ies_research schema/fh2t_student_action_logs.csv")
+
+
+###### Write fh2t_student_action_logs table ######
+if (dbExistsTable(ies_research_con, "fh2t_student_action_logs"))
+  dbRemoveTable(ies_research_con, "fh2t_student_action_logs")
+RSQLite::dbWriteTable(ies_research_con, "fh2t_student_action_logs", logs_cln, overwrite == TRUE)
 
 
 
 #### Build fh2t_student_problem_attempt ####
 logs_cln <- logs_cln %>%
-  ungroup()%>%
-  arrange(StuID, time) %>%
-  filter(subtype != "leave") %>% # leave is duplicate of complete and it is
+  dplyr::ungroup()%>%
+  dplyr::arrange(StuID, time) %>%
+  dplyr::filter(subtype != "leave") %>% # leave is duplicate of complete and it is
                                  # screwing with the start/end time calculations
   dplyr::group_by(StuID, problem_id) %>% # this grouping is only for the lag section, 
                                            # so that the lags don't cross over into other problems
@@ -304,9 +305,9 @@ logs_cln <- logs_cln %>%
     # this is a indicator that the next problem attempt was started due to a reset
     reset = ifnull(lag(ifelse(subtype == "reset", 1, 0)), 0),
     #this offset will be used to create the end time when I aggregate all of the data at the action level
-    time_offset = lag(time) ) %>%
+    time_offset = lag(time)) %>%
   dplyr::ungroup() %>%
-  dplyr::mutate(
+  dplyr::mutate( 
     # this creates a flag for when a student completed the problem 
     completed_flag = ifnull((ifelse(subtype == "complete", 1, 0)),0),
     step = ifelse(subtype == "rewrite", 1, 0),
@@ -315,14 +316,16 @@ logs_cln <- logs_cln %>%
                                     ifelse(reset == 1, 1, 0)) ,# this creates a flag for whenever a starts a new
     library =ifelse(subtype == "library" & action == "open", 1, 0),
     hint =ifelse(subtype == "hint", 1, 0),
+    #this will be used to see if students reste the question by leaving anc comming back
+    visit = ifnull((ifelse(subtype == "visit", 1, 0)), 0)
   ) %>%
   dplyr::group_by(StuID, problem_id) %>%
   dplyr::mutate(
+                visit_num = cumsum(visit),
                 # replay_attempt_num includes only instances where students go back after replaying
                 replay_attempt_num = cumsum(replay_attempt_flag)+1,
                 # attempt number includes both attempts for reset and attempt for replay
-                attempt_num = cumsum(reset_replay)+1,
-                
+                attempt_num = cumsum(reset_replay)+1
                 ) %>% 
   dplyr::group_by(StuID, problem_id, replay_attempt_num) %>%  
   dplyr::mutate(
@@ -337,10 +340,37 @@ logs_cln <- logs_cln %>%
                 attempt_dur = sum(ifnull(dur, 0)),### NOTE THAT THIS IS ONLY A REACTION TIME AND SHOULD NOT BE 
                                                   ### USED AS TOTAL ATTEMPT TIME. I AM ONLY USING THIS TO DROP
                                                   ### FALSE ATTEMPTS WITH NULL DURATION TIMES 
-                                  
-                completed_dur_attempt = sum(completed_flag)
+                completed_dur_attempt = sum(completed_flag),
+                
+                # this is a flag for visits within an attempt which is equivilant to a reset 
+                # if a student has visited the problem multiple times within a attempt, it resets each time
+                num_vists = sum(visit),
+                multiple_visits_within_attempt = ifelse(sum(visit) > 1, 1, 0)
+                
                 ) %>%
   filter(attempt_dur > 0) # this excluded the last leave which is not an actual attempt
+
+
+
+
+
+# visits with with attempt
+# explore visits within attempt to see if this is in affect a reset
+
+table(logs_cln$num_vists) # we expect visit be zero on reset attempts
+table(logs_cln$num_vists, logs_cln$completed_dur_attempt)
+table(logs_cln$num_vists, logs_cln$reset)
+
+
+table( logs_cln$attempt_num == 1, logs_cln$replay_attempt) # never a replay attempt on first attempt
+table( logs_cln$attempt_num == 1, logs_cln$num_vists) # there are 2676 logs where a visit is missing on the first attempt (odd, but nor really important)
+
+
+table(logs_cln[logs_cln$attempt_num > 1,]$num_vists == 0, logs_cln[logs_cln$attempt_num > 1,]$replay_attempt)
+    # there are 703 logs where a visit is missing on the  (odd, but nor really important)
+
+
+table(logs_cln$multiple_visits_within_attempt, logs_cln$completed_dur_attempt)/length(logs_cln$completed_dur_attempt)
 
 
 
@@ -381,38 +411,40 @@ spa <- logs_cln %>%
     num_steps = sum(step),
     num_errors = sum(errors),
     num_hints = sum(hint),
-    num_libary_open = sum(library),
+    num_library_open = sum(library),
     replay_attempt = max(replay_attempt),
     completed_dur_attempt = max(completed_dur_attempt),
-    resets_within_replay_attempt = max(resets_within_replay_attempt) # will drop this before saving, but need for student_problem_aggregation 
-  ) %>%  #### add Clover data
-  left_join(fpm %>%
+    resets_within_replay_attempt = max(resets_within_replay_attempt), # will drop this before saving, but need for student_problem_aggregation 
+    multiple_visits_within_attempt = max(multiple_visits_within_attempt) 
+    ) %>%  #### add Clover data
+  dplyr::left_join(fpm %>%
               select(problem_id,
-                     optimal_step),
+                     optimal_steps),
             by = c("problem_id")
             ) %>%
-  mutate(steps_over_optimal = num_steps-optimal_step,
+  dplyr::mutate(steps_over_optimal = num_steps-optimal_steps,
          clovers = ifelse(completed_dur_attempt == 0, NA,
                           ifelse(steps_over_optimal <= 0, 3, 
                           ifelse(steps_over_optimal <= 2, 2, 
                           1)))) %>%
-  select(-steps_over_optimal)
+  dplyr::select(-steps_over_optimal)
+
 
 mice::md.pattern(spa)
 
 
-# ###### SAVE "fh2t_student_problem_attempt.csv FILE #######
-# write.csv(spa %>%
-#             select(-resets_within_replay_attempt), "ies_research schema/fh2t_student_problem_attempt.csv") 
-# 
-# 
-# ###### Write fh2t_student_problem_attempt table ######
-# if (dbExistsTable(ies_research_con, "fh2t_student_problem_attempt"))
-#   dbRemoveTable(ies_research_con, "fh2t_student_problem_attempt")
-# RSQLite::dbWriteTable(ies_research_con, "fh2t_student_problem_attempt", spa, overwrite == T)
+ ###### SAVE "fh2t_student_problem_attempt.csv FILE #######
+ write.csv(spa %>%
+            select(-resets_within_replay_attempt), "ies_research schema/fh2t_student_problem_attempt.csv")
+
+
+###### Write fh2t_student_problem_attempt table ######
+if (dbExistsTable(ies_research_con, "fh2t_student_problem_attempt"))
+  dbRemoveTable(ies_research_con, "fh2t_student_problem_attempt")
+RSQLite::dbWriteTable(ies_research_con , "fh2t_student_problem_attempt", spa %>%
+                        select(-resets_within_replay_attempt), overwrite = T)
 
 #### Build fh2t_student_problem ####
-
 sp <- spa %>%
   dplyr::group_by(StuID, problem_id) %>%
   dplyr::summarise(
@@ -421,11 +453,12 @@ sp <- spa %>%
     total_num_attempts = max(attempt_num),
     total_errors = sum(num_errors),
     total_hints = sum(num_hints),
-    total_libary_open = sum(num_libary_open),
+    total_library_open = sum(num_library_open),
     total_completed_attempts = sum(completed_dur_attempt),
     total_resets = sum(ifelse(replay_attempt == 1, 0, 1)),
     total_replay = sum(replay_attempt)
   ) %>%
+  # this joins onto the the attempt table but only pulls in data from their best attempt
   left_join(
     spa %>%
       group_by(StuID, problem_id) %>%
@@ -442,7 +475,8 @@ sp <- spa %>%
              num_errors,
              num_hints,
              resets_within_replay_attempt,
-             num_libary_open,
+             multiple_visits_within_attempt,
+             num_library_open,
              start_time,
              end_time
              ) %>%
@@ -466,7 +500,8 @@ sp <- spa %>%
              num_errors,
              num_hints,
              resets_within_replay_attempt,
-             num_libary_open,
+             multiple_visits_within_attempt,
+             num_library_open,
              start_time,
              end_time) %>%
       dplyr::rename(num_resets=resets_within_replay_attempt) %>%
@@ -489,7 +524,8 @@ sp <- spa %>%
              num_errors,
              num_hints,
              resets_within_replay_attempt,
-             num_libary_open,
+             multiple_visits_within_attempt,
+             num_library_open,
              start_time,
              end_time) %>%
       dplyr::rename(num_resets=resets_within_replay_attempt) %>%
@@ -504,11 +540,11 @@ table( sp$total_completed_attempts, is.na(sp$best_clovers)) # missing data only 
 
 table(sp$problem_id, is.na(sp$best_clovers))
 
-# ###### SAVE fh2t_student_problem.csv FILE #######
-# write.csv(sp , "ies_research schema/fh2t_student_problem.csv") 
-# 
-# ###### Write fh2t_student_problem table ######
-# if (dbExistsTable(ies_research_con, "fh2t_student_problem"))
-#   dbRemoveTable(ies_research_con, "fh2t_student_problem")
-# RSQLite::dbWriteTable(ies_research_con, "fh2t_student_problem", sp, overwrite == T)
+###### SAVE fh2t_student_problem.csv FILE #######
+write.csv(sp , "ies_research schema/fh2t_student_problem.csv")
+
+###### Write fh2t_student_problem table ######
+if (dbExistsTable(ies_research_con, "fh2t_student_problem"))
+  dbRemoveTable(ies_research_con, "fh2t_student_problem")
+RSQLite::dbWriteTable(ies_research_con, "fh2t_student_problem", sp, overwrite = T)
 
