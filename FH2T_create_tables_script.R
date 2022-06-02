@@ -41,6 +41,7 @@ options(scipen = 100)
 
 
 ### Connect to SQLite DB ####
+# set db path
 ies_research_con <- dbConnect(RSQLite::SQLite(), "ies_research schema/maple_ies_research.db")
 
 ### LOAD DATA ####
@@ -294,34 +295,46 @@ RSQLite::dbWriteTable(ies_research_con, "fh2t_student_action_logs", logs_cln, ov
 #### Build fh2t_student_problem_attempt ####
 logs_cln <- logs_cln %>%
   dplyr::ungroup()%>%
-  dplyr::arrange(StuID, time) %>%
-  dplyr::filter(subtype != "leave") %>% # leave is duplicate of complete and it is
-                                 # screwing with the start/end time calculations
+  dplyr::arrange(StuID, problem_id, time) %>%
+  dplyr::filter(subtype != "leave",# leave is duplicate of complete and it is
+                                   # screwing with the start/end time calculations
+                ifelse(subtype == "visit" & lag(subtype) == "visit", 1, 0) == 0 # visits is sometimes duplicated
+                                                                                # this code drops only duplicated 
+                                                                                # rows
+                ) %>%
   dplyr::group_by(StuID, problem_id) %>% # this grouping is only for the lag section, 
                                            # so that the lags don't cross over into other problems
   dplyr::mutate(
     # this is lagged such that the flag starts on the first action after the complete will be
-    replay_attempt_flag = ifnull(lag(ifelse(subtype == "complete", 1, 0)),0), 
+    replay_attempt_flag = ifnull(ifelse(lag(subtype) == "complete", 1, 0),0), 
+    
     # this is a indicator that the next problem attempt was started due to a reset
     reset = ifnull(lag(ifelse(subtype == "reset", 1, 0)), 0),
+    
     #this offset will be used to create the end time when I aggregate all of the data at the action level
-    time_offset = lag(time)) %>%
+    time_offset = lag(time),
+    
+    # this creates an indicator of the first row of 
+        row_num = row_number()
+    ) %>%
   dplyr::ungroup() %>%
   dplyr::mutate( 
     # this creates a flag for when a student completed the problem 
     completed_flag = ifnull((ifelse(subtype == "complete", 1, 0)),0),
     step = ifelse(subtype == "rewrite", 1, 0),
     errors = ifelse(subtype == "mistake", 1, 0),
+    visit = ifnull((
+      ifelse(subtype == "visit" & row_num == 1, 0,
+      ifelse(subtype == "visit", 1, 0))), 0),
     reset_replay = ifelse(replay_attempt_flag == 1, 1,
-                                    ifelse(reset == 1, 1, 0)) ,# this creates a flag for whenever a starts a new
+                          ifelse(reset == 1, 1,
+                                 ifelse(visit == 1, 1 ,0))),# this creates a flag for whenever a student starts a new attempt (replay, reset, vist)
     library =ifelse(subtype == "library" & action == "open", 1, 0),
-    hint =ifelse(subtype == "hint", 1, 0),
-    #this will be used to see if students reste the question by leaving anc comming back
-    visit = ifnull((ifelse(subtype == "visit", 1, 0)), 0)
+    hint =ifelse(subtype == "hint", 1, 0)
+    #this will be used to see if students reset the question by leaving anc comming back
   ) %>%
   dplyr::group_by(StuID, problem_id) %>%
-  dplyr::mutate(
-                visit_num = cumsum(visit),
+  dplyr::mutate(visit_num = cumsum(visit),
                 # replay_attempt_num includes only instances where students go back after replaying
                 replay_attempt_num = cumsum(replay_attempt_flag)+1,
                 # attempt number includes both attempts for reset and attempt for replay
@@ -330,8 +343,8 @@ logs_cln <- logs_cln %>%
   dplyr::group_by(StuID, problem_id, replay_attempt_num) %>%  
   dplyr::mutate(
     # number of resets within the 
-    resets_within_replay_attempt = sum(reset)
-    
+    resets_within_replay_attempt = sum(reset),
+    errors_within_replay_attempt = sum(errors)
   ) %>%
   dplyr::group_by(StuID, problem_id, attempt_num) %>%  
   dplyr::mutate(num_steps = sum(step),
@@ -346,13 +359,109 @@ logs_cln <- logs_cln %>%
                 # if a student has visited the problem multiple times within a attempt, it resets each time
                 num_vists = sum(visit),
                 multiple_visits_within_attempt = ifelse(sum(visit) > 1, 1, 0)
-                
                 ) %>%
   filter(attempt_dur > 0) # this excluded the last leave which is not an actual attempt
 
+table(logs_cln$attempt_num)
+colnames(logs_cln)
+
+###### SAVE "fh2t_student_action_logs.csv FILE #######
+write.csv(logs_cln, "ies_research schema/fh2t_student_action_logs.csv")
+colnames(logs)
+#logs_cln<-read.csv("ies_research schema/fh2t_student_action_logs.csv")
 
 
+###### Write fh2t_student_action_logs table ######
+if (dbExistsTable(ies_research_con, "fh2t_student_action_logs"))
+  dbRemoveTable(ies_research_con, "fh2t_student_action_logs")
+RSQLite::dbWriteTable(ies_research_con, "fh2t_student_action_logs", 
+                      logs_cln %>% 
+                        select(
+                          StuID,
+                          problem_id,
+                          attempt_num,
+                          canvas_id,
+                          trial_id,
+                          world_id,
+                          world_problem_num,
+                          time,
+                          timestamp,
+                          dur,
+                          type,
+                          subtype,
+                          new_state,
+                          old_state,
+                          method,
+                          mistake,
+                          target_ascii,
+                          action
+                          
+                        )
+                      , 
+                      overwrite = TRUE)
 
+
+# check <- logs_cln %>%
+#   filter(
+#     StuID == 2,
+#     
+#     problem_id == 33
+#   )  %>%
+#   filter(
+#     ifelse(
+#        subtype == "visit" & prev_subtype == "visit", 1, 0
+#     ) == 0
+#   )  %>%
+#   mutate(
+#     reset_replay_visit = ifelse(replay_attempt_flag == 1, 1,
+#                            ifelse(reset == 1, 1,
+#                                   ifelse(visit == 1, 1 ,0))) 
+#   ) %>%
+# dplyr::group_by(StuID, problem_id) %>%
+#   dplyr::mutate(
+#     # replay_attempt_num includes only instances where students go back after replaying
+#     replay_attempt_num = cumsum(replay_attempt_flag)+1,
+#     # attempt number includes both attempts for reset and attempt for replay
+#     attempt_num2 = cumsum(reset_replay_visit)
+#   ) %>%
+#   dplyr::group_by(StuID, problem_id, attempt_num2) %>%  
+#   dplyr::mutate(num_steps = sum(step),
+#                 num_errors = sum(errors),
+#                 replay_attempt = sum(replay_attempt_flag),
+#                 attempt_dur = sum(ifnull(dur, 0)),### NOTE THAT THIS IS ONLY A REACTION TIME AND SHOULD NOT BE 
+#                 ### USED AS TOTAL ATTEMPT TIME. I AM ONLY USING THIS TO DROP
+#                 ### FALSE ATTEMPTS WITH NULL DURATION TIMES 
+#                 completed_dur_attempt = sum(completed_flag),
+#                 
+#                 # this is a flag for visits within an attempt which is equivilant to a reset 
+#                 # if a student has visited the problem multiple times within a attempt, it resets each time
+#                 num_vists = sum(visit),
+#                 multiple_visits_within_attempt = ifelse(sum(visit) > 1, 1, 0)
+#                 
+#   ) %>%
+#   select(
+#     StuID,
+#     problem_id,
+#     time,
+#     subtype,
+#     prev_subtype,
+#     old_state,
+#     new_state,
+#     attempt_num,
+#     attempt_num2,
+#     reset_replay_visit,
+#     replay_attempt_num,
+#     step,
+#     errors,
+#     reset,
+#     replay_attempt_flag,
+#     visit,
+#     visit_num,
+#     num_steps,
+#     num_errors
+#     
+#   )
+#   
 
 # visits with with attempt
 # explore visits within attempt to see if this is in affect a reset
@@ -374,30 +483,33 @@ table(logs_cln$multiple_visits_within_attempt, logs_cln$completed_dur_attempt)/l
 
 
 
-# checking work
-# example1 <- logs_cln %>%
-#   filter(StuID == 1686, 
-#          problem_id ==25) %>%
-#   select(StuID, 
-#          problem_id,
-#          attempt_num,
-#          time,
-#          time_offset,
-#          replay_attempt,
-#          completed_dur_attempt,
-#          subtype,
-#          dur,
-#          reset_replay,
-#          action,
-#          replay_attempt_num,
-#          step,
-#          num_steps,
-#          resets_within_replay_attempt,
-#          errors,
-#          num_errors,
-#          trial_id  ) %>%
-#   arrange(time)
-# rm(example1)
+#checking work
+example1 <- logs_cln %>%
+  filter(StuID == 1852,
+         problem_id ==111) %>%
+  select(StuID,
+         problem_id,
+         attempt_num,
+         time,
+         time_offset,
+         replay_attempt,
+         completed_dur_attempt,
+         subtype,
+         dur,
+         reset_replay,
+         action,
+         replay_attempt_num,
+         replay_attempt,
+         step,
+         num_steps,
+         resets_within_replay_attempt,
+         errors,
+         num_errors,
+         errors_within_replay_attempt,
+         trial_id  ) %>%
+  arrange(time)
+rm(example1)
+sum(example1$errors)
 
 
 spa <- logs_cln %>%
@@ -415,7 +527,7 @@ spa <- logs_cln %>%
     replay_attempt = max(replay_attempt),
     completed_dur_attempt = max(completed_dur_attempt),
     resets_within_replay_attempt = max(resets_within_replay_attempt), # will drop this before saving, but need for student_problem_aggregation 
-    multiple_visits_within_attempt = max(multiple_visits_within_attempt) 
+    errors_within_replay_attempt = sum(errors_within_replay_attempt)
     ) %>%  #### add Clover data
   dplyr::left_join(fpm %>%
               select(problem_id,
@@ -442,7 +554,8 @@ mice::md.pattern(spa)
 if (dbExistsTable(ies_research_con, "fh2t_student_problem_attempt"))
   dbRemoveTable(ies_research_con, "fh2t_student_problem_attempt")
 RSQLite::dbWriteTable(ies_research_con , "fh2t_student_problem_attempt", spa %>%
-                        select(-resets_within_replay_attempt), overwrite = T)
+                        select(-resets_within_replay_attempt,
+                               -errors_within_replay_attempt), overwrite = T)
 
 #### Build fh2t_student_problem ####
 sp <- spa %>%
@@ -475,7 +588,7 @@ sp <- spa %>%
              num_errors,
              num_hints,
              resets_within_replay_attempt,
-             multiple_visits_within_attempt,
+             errors_within_replay_attempt,
              num_library_open,
              start_time,
              end_time
@@ -500,7 +613,7 @@ sp <- spa %>%
              num_errors,
              num_hints,
              resets_within_replay_attempt,
-             multiple_visits_within_attempt,
+             errors_within_replay_attempt,
              num_library_open,
              start_time,
              end_time) %>%
@@ -524,7 +637,7 @@ sp <- spa %>%
              num_errors,
              num_hints,
              resets_within_replay_attempt,
-             multiple_visits_within_attempt,
+             errors_within_replay_attempt,
              num_library_open,
              start_time,
              end_time) %>%
