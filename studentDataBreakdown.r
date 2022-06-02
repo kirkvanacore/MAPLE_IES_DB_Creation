@@ -1,4 +1,5 @@
 library(dplyr)
+library(mice)
 
 # Needed breakdowns: 
 # student_assess
@@ -6,18 +7,18 @@ library(dplyr)
 # student_demo
 # student_roster
 # Student_attendance
+# 
+ TESTING <- FALSE
 
-TESTING <- FALSE
-
-
-## TODO Remove
-setwd("C:/Users/sidpr/Desktop/Work/Summer/DataProcessingMAPLE")
+ 
+# ## TODO Remove
+# setwd("C:/Users/sidpr/Desktop/Work/Summer/DataProcessingMAPLE")
 
 # master csv file to breakdown
-master_csv <- read.csv("csvData/DATA20220202_4092.csv")
+master_csv <- read.csv("DATA20220202_4092.csv", na.strings = c("#NULL!"))
 
 # Creating a connection SQLite database
-con <- RSQLite::dbConnect(RSQLite::SQLite(), "ies_research_schema/maple_ies_research.db")
+ies_research_con <- dbConnect(RSQLite::SQLite(), "ies_research schema/maple_ies_research.db")
 
 
 # Simple function that takes in database connection, table name and new data to over ride
@@ -31,8 +32,7 @@ overwrite_table <- function(connection, table_name, data) {
     
 }
 
-
-
+### Divide Variables ####
 # Defining the colnames to breakdown the large data with
 demographic <- c("StuID",
           "RACE",
@@ -255,30 +255,40 @@ assesment <- c("StuID",
     
     
 
+### Create Tables ####
+assess_student <- dplyr::select(master_csv,assesment)
+md.pattern(assess_student)
 
-student_assess <- dplyr::select(master_csv,assesment)
 student_fidelity <- dplyr::select(master_csv,fidelity)
+md.pattern(student_fidelity)
+
 student_demo <- dplyr::select(master_csv,demographic)
+md.pattern(student_demo)
+
 student_roster <- dplyr::select(master_csv,roster)
+md.pattern(student_roster)
+
 student_attendance <- dplyr::select(master_csv,attendance)
+md.pattern(student_attendance)
 
-# Saving as CSV and uploading to DB
 
-PREFIX <- "IES_MAPLE_"
-write.csv(student_assess,paste0(PREFIX,"student_assess.csv"))
-overwrite_table(con, paste0(PREFIX,"student_assess"), student_assess)
 
-write.csv(student_fidelity,paste0(PREFIX,"student_fidelity.csv"))
-overwrite_table(con, paste0(PREFIX,"student_fidelity"), student_fidelity)
+### Saving as CSV and uploading to DB ####
 
-write.csv(student_demo,paste0(PREFIX,"student_demo.csv"))
-overwrite_table(con, paste0(PREFIX,"student_demo"), student_demo)
+write.csv(assess_student,"ies_research schema/assess_student.csv")
+overwrite_table(ies_research_con, "assess_student", assess_student)
 
-write.csv(student_roster,paste0(PREFIX,"student_roster.csv"))
-overwrite_table(con, paste0(PREFIX,"student_roster"), student_roster)
+write.csv(student_fidelity,"ies_research schema/student_fidelity.csv")
+overwrite_table(ies_research_con, "student_fidelity", student_fidelity)
 
-write.csv(student_attendance,paste0(PREFIX,"student_attendance.csv"))
-overwrite_table(con, paste0(PREFIX,"student_attendance"), student_attendance)
+write.csv(student_demo,"ies_research schema/student_demo.csv")
+overwrite_table(ies_research_con, "student_demo", student_demo)
+
+write.csv(student_roster,"ies_research schema/student_roster.csv")
+overwrite_table(ies_research_con, "student_roster", student_roster)
+
+write.csv(student_attendance,"ies_research schema/student_attendance.csv")
+overwrite_table(ies_research_con, "student_attendance", student_attendance)
 
 
 
