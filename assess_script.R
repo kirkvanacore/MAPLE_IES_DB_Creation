@@ -1,7 +1,7 @@
 #### Uploading Assessment/student Meta Data Tables ####
 
 ####Installing & Loading Packages###
-#create list of packagess
+#create list of packages
 packages = c(
   "tidyverse",
   "plyr",
@@ -25,7 +25,7 @@ package.check <- lapply(
 ) 
 rm(package.check, packages)
 
-colClean <- function(x){ colnames(x) <- sub(".", "_", colnames(x)); x } 
+colClean <- function(x){ colnames(x) <- sub("[.]", "_", colnames(x)); x } 
 
 
 
@@ -39,7 +39,7 @@ ies_research_con <- dbConnect(RSQLite::SQLite(), "ies_research schema/maple_ies_
 
 
 ## load assessment data
-assess <- read.csv("DATA20220202_4092 copy.csv")
+assess <- read.csv("DATA20220202_4092.csv")
 colnames(assess)
 
 # get rid of '.' in colnames

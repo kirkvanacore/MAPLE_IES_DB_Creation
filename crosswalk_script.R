@@ -84,6 +84,8 @@ table(is.na(cross$userID))
 table(is.na(FH2T$userID))
 # there are 501 students who were assigned to the FH2T Condition, who did not have any activity in FH2T
 
+### ADDING ASSISTments 
+assist<-read.csv("ASSISTment_student_id_crosswalk.csv")
 
 # final cleaning before save
 

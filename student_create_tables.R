@@ -8,19 +8,19 @@ library(mice)
 # student_roster
 # Student_attendance
 # 
- TESTING <- FALSE
 
  
 # ## TODO Remove
 # setwd("C:/Users/sidpr/Desktop/Work/Summer/DataProcessingMAPLE")
 
-# master csv file to breakdown
-master_csv <- read.csv("DATA20220202_4092.csv", na.strings = c("#NULL!"))
 
-# Creating a connection SQLite database
-ies_research_con <- dbConnect(RSQLite::SQLite(), "ies_research schema/maple_ies_research.db")
+#### Create Functions ####
+# get rid of "." because it messess with the queries
+colClean <- function(x){   colnames(x) = gsub("\\.", "_", colnames(x)); x } 
 
 
+### Create Functions
+TESTING <- FALSE
 # Simple function that takes in database connection, table name and new data to over ride
 overwrite_table <- function(connection, table_name, data) {
     if (!TESTING){
@@ -32,8 +32,20 @@ overwrite_table <- function(connection, table_name, data) {
     
 }
 
+#### Load Data ####
+# master csv file to breakdown
+master_csv <- read.csv("DATA20220202_4092.csv", na.strings = c("#NULL!"))
+master_csv <- colClean(master_csv)
+colnames(master_csv)
+#### Connecting to Database ####
+# Creating a connection SQLite database
+ies_research_con <- dbConnect(RSQLite::SQLite(), "ies_research schema/maple_ies_research.db")
+
+
 ### Divide Variables ####
 # Defining the colnames to breakdown the large data with
+
+##### student_demo ####
 demographic <- c("StuID",
           "RACE",
           "Gender",
@@ -42,8 +54,15 @@ demographic <- c("StuID",
           "raceEthnicity",
           "raceEthnicityFed",
           "hispanicEthnicity",
-          "IEP")
+          "IEP",
+          "EIP",
+          "EL_PARENT_DENIED",
+          "ESOL_C",
+          "ESOL_FORMER",
+          "ESOL",
+          "GIFTED")
 
+##### student_roster ####
 roster <- c("StuID",
             "SchIDPre",
             "TeaIDPre_within_school",
@@ -93,18 +112,9 @@ roster <- c("StuID",
             "G5Sch1ID",
             "G5Sch2ID",
             "G6Sch1ID",
-            "G6Sch2ID",
-            "Scale.Score5",
-            "Performance.Level5",
-            "Scale.Score7",
-            "Performance.Level7",
-            "EIP",
-            "EL_PARENT_DENIED",
-            "ESOL_C",
-            "ESOL_FORMER",
-            "ESOL",
-            "GIFTED")
-
+            "G6Sch2ID"
+           )
+##### student_attendance ####
 attendance <- c("StuID",
                 "IN5",
                 "AbsentDays5",
@@ -114,7 +124,7 @@ attendance <- c("StuID",
                 "MEMBERSHIPDAYS5",
                 "ADM5",
                 "ADA5",
-                "Absencesavg.Daily5",
+                "Absencesavg_Daily5",
                 "PercentInAttendance5",
                 "IN6",
                 "AbsentDays6",
@@ -124,17 +134,18 @@ attendance <- c("StuID",
                 "MEMBERSHIPDAYS6",
                 "ADM6",
                 "ADA6",
-                "Absencesavg.Daily6",
+                "Absencesavg_Daily6",
                 "PercentInAttendance6",
-                "Membership.Days7",
-                "Absent.Days7",
-                "Present.Days7",
+                "Membership_Days7",
+                "Absent_Days7",
+                "Present_Days7",
                 "ADM7",
                 "ADA",
-                "Unexcused.Days7",
-                "Absences.avg..Daily7",
-                "Percent.In.Attendance7")
+                "Unexcused_Days7",
+                "Absences_avg__Daily7",
+                "Percent_In_Attendance7")
 
+##### student_fidelity ####
 fidelity <- c("StuID",
               "fidelity_started_sum",
               "fidelity_complete_sum",
@@ -166,16 +177,21 @@ fidelity <- c("StuID",
               "started_delayed_posttest",
               "complete_delayed_posttest")
 
+##### student_assess ####
 assesment <- c("StuID",
-               "pre.total_math_score",
-               "pre.percentage_math_score",
-               "pre.sub_P_score",
-               "pre.sub_C_score",
-               "pre.sub_F_score",
-               "pre.math_completed_num",
-               "pre.math_completed_percent",
-               "pre.total_time_on_tasks",
-               "pre.avg_time_on_tasks",
+               "Scale_Score5",
+               "Performance_Level5",
+               "Scale_Score7",
+               "Performance_Level7",
+               "pre_total_math_score",
+               "pre_percentage_math_score",
+               "pre_sub_P_score",
+               "pre_sub_C_score",
+               "pre_sub_F_score",
+               "pre_math_completed_num",
+               "pre_math_completed_percent",
+               "pre_total_time_on_tasks",
+               "pre_avg_time_on_tasks",
                "pre_MA_total_score",
                "pre_MA_avg_score",
                "pre_MSE_total_score",
@@ -189,15 +205,15 @@ assesment <- c("StuID",
                "pre_PS_total_RT_sec",
                "pre_PS_total_RT_min",
                "pre_PS_avg_RT_sec",
-               "mid.total_math_score",
-               "mid.percentage_math_score",
-               "mid.sub_P_score",
-               "mid.sub_C_score",
-               "mid.sub_F_score",
-               "mid.math_completed_num",
-               "mid.math_completed_percent",
-               "mid.total_time_on_tasks",
-               "mid.avg_time_on_tasks",
+               "mid_total_math_score",
+               "mid_percentage_math_score",
+               "mid_sub_P_score",
+               "mid_sub_C_score",
+               "mid_sub_F_score",
+               "mid_math_completed_num",
+               "mid_math_completed_percent",
+               "mid_total_time_on_tasks",
+               "mid_avg_time_on_tasks",
                "mid_MA_total_score",
                "mid_MA_avg_score",
                "mid_negative_reaction_score",
@@ -212,15 +228,15 @@ assesment <- c("StuID",
                "mid_PS_total_RT_sec",
                "mid_PS_total_RT_min",
                "mid_PS_avg_RT_sec",
-               "post.total_math_score",
-               "post.percentage_math_score",
-               "post.sub_P_score",
-               "post.sub_C_score",
-               "post.sub_F_score",
-               "post.math_completed_num",
-               "post.math_completed_percent",
-               "post.total_time_on_tasks",
-               "post.avg_time_on_tasks",
+               "post_total_math_score",
+               "post_percentage_math_score",
+               "post_sub_P_score",
+               "post_sub_C_score",
+               "post_sub_F_score",
+               "post_math_completed_num",
+               "post_math_completed_percent",
+               "post_total_time_on_tasks",
+               "post_avg_time_on_tasks",
                "post_MA_total_score",
                "post_MA_avg_score",
                "post_MSE_total_score",
@@ -234,15 +250,15 @@ assesment <- c("StuID",
                "post_PS_total_RT_sec",
                "post_PS_total_RT_min",
                "post_PS_avg_RT_sec",
-               "delayed.total_math_score",
-               "delayed.percentage_math_score",
-               "delayed.sub_P_score",
-               "delayed.sub_C_score",
-               "delayed.sub_F_score",
-               "delayed.math_completed_num",
-               "delayed.math_completed_percent",
-               "delayed.total_time_on_tasks",
-               "delayed.avg_time_on_tasks",
+               "delayed_total_math_score",
+               "delayed_percentage_math_score",
+               "delayed_sub_P_score",
+               "delayed_sub_C_score",
+               "delayed_sub_F_score",
+               "delayed_math_completed_num",
+               "delayed_math_completed_percent",
+               "delayed_total_time_on_tasks",
+               "delayed_avg_time_on_tasks",
                "delayed_PS_tasks_total_score",
                "delayed_PS_part1_score",
                "delayed_PS_part2E_score",
@@ -289,6 +305,3 @@ overwrite_table(ies_research_con, "student_roster", student_roster)
 
 write.csv(student_attendance,"ies_research schema/student_attendance.csv")
 overwrite_table(ies_research_con, "student_attendance", student_attendance)
-
-
-
