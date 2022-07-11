@@ -46,7 +46,7 @@ panderOptions('keep.trailing.zeros', TRUE)
 assessment_raw <- read.csv("ies_dataset_2021_0527.csv")
 
 # master file (roster)
-final_roster <- read_excel("finalrosters_allstudents_2021_04_25_updated.xlsx")
+final_roster <- read_excel("roster_demographic_2022_06_16_N=4,343.xlsx")
 
 # problem id
 assessmemt_problem_id <- read_excel("assessment_problem_id_forsyth_2020.xlsx")
@@ -62,12 +62,10 @@ assessment  <- assessment_raw  %>% select(-'type', -'school_id', -'teacher_id', 
 
 ### cleaning the master file
 ```{r}
-# changing the variable name 
-names(final_roster)[names(final_roster) == "Student_ID"] <- "student_id"
-
 # Selecting columns 
-final_roster  <- final_roster  %>% select('student_number', 'student_id', 'Condition Assignment')
+final_roster  <- final_roster %>% select('student_id', 'StuID', 'condition_assignment')
 ```
+
 
 ### adding the problem number info
 ```{r}
@@ -1412,9 +1410,15 @@ ies_aggregation <- final_roster %>%
 
 ```
 
+### Removing the original ID 
+```{r}
+ies_aggregation <- ies_aggregation %>% select(-student_id)
+```
+
+
 ### Filtering out the problem-level data 
 ```{r}
-ies_aggregation_student <- ies_aggregation[ ,grepl("student_number|student_id|Condition Assignment|pre.|mid.|post.|delayed.", 
+ies_aggregation_student <- ies_aggregation[ ,grepl("StuID|condition_assignment|pre.|mid.|post.|delayed.", 
                     names(ies_aggregation))]
 
 ies_aggregation_problem <- ies_aggregation[ ,!grepl("pre|mid.|post.|delayed.", 
@@ -1426,8 +1430,8 @@ ies_aggregation_problem <- ies_aggregation[ ,!grepl("pre|mid.|post.|delayed.",
 # Exporting the dataset into xlsx 
 ```{r}
 write_xlsx(x = ies_aggregation_student, 
-           path = "ies_assessment_aggregation_student_20220616.xlsx", col_names = TRUE)
+           path = "ies_assessment_aggregation_student_20220629.xlsx", col_names = TRUE)
 
 write_xlsx(x = ies_aggregation_problem, 
-           path = "ies_assessment_aggregation_problem_20220616.xlsx", col_names = TRUE)
+           path = "ies_assessment_aggregation_problem_20220629.xlsx", col_names = TRUE)
 ```

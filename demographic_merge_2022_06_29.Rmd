@@ -391,16 +391,22 @@ df <- df %>% replace_na(replace = list(initial_SchID = -999,
 ```
 
 
+### Removing Original IDs for external use 
+```{r}
+df <- df %>% select(-student_number, -student_id, -initial_school_id, -final_school_id,
+                    -initial_teacher_id, -final_teacher_id, -initial_teacher_class, -final_teacher_class, -initial_section_number, -final_section_number, -G5SCHOOL, -G5SCHOOL2, -G6SCHOOL, -G6SCHOOL2) 
+```
+
 
 ```{r}
 # reordering
-df <- df %>% relocate(student_number, student_id, StuID, initial_school_id,                                  
-                      initial_SchID, final_school_id, final_SchID, initial_teacher_id,
+df <- df %>% relocate(StuID,                                   
+                      initial_SchID, final_SchID, 
                       initial_TeaID,                         
-                      initial_TeaID_within_school, final_teacher_id, final_TeaID, 
-                      final_TeaID_within_school, initial_teacher_class, initial_ClaID,                        
-                      final_teacher_class, final_ClaID, initial_section_number, 
-                      initial_SecID, final_section_number, final_SecID)
+                      initial_TeaID_within_school, final_TeaID, 
+                      final_TeaID_within_school, initial_ClaID,                        
+                      final_ClaID,  
+                      initial_SecID, final_SecID)
 
 
 df <- df %>% relocate(c("FH2T", "DragonBox", "Instant", "Delay"), .after = condition_assignment)
@@ -420,15 +426,14 @@ df <- df %>% relocate(raceEthnicityFed, .before=hispanicEthnicity)
 df <- df %>% relocate(KEEP, .after = courseName)
 
 
-df <- df %>% relocate(c(G5SCHOOL, G5SchID, G5SCHOOL2, G5SchID2, G5SCHOOL3, G6SCHOOL, G6SchID, G6SCHOOL2, G6SchID2, G6SCHOOL3), .after = SST)
+df <- df %>% relocate(c(G5SchID, G5SchID2, G5SCHOOL3, G6SchID,G6SchID2, G6SCHOOL3), .after = SST)
 ```
-
 
 
 
 ### data export
 ```{r}
 write_xlsx(x = df, 
-           path = "roster_demographic_2022_06_16_N=4,343.xlsx", col_names = TRUE)
+           path = "roster_demographic_2022_06_29_N=4,343.xlsx", col_names = TRUE)
 ```
 
