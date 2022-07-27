@@ -663,27 +663,35 @@ RSQLite::dbWriteTable(ies_research_con, "fh2t_student_problem", sp, overwrite = 
 
 #### Build fh2t_student ####
 student_level <- sp %>% dplyr::group_by(StuID) %>% 
-                dplyr::summarize(
-                    # Total number of rows in a group
-                    num_problems = n(), 
-                    # If a problem has been completed, it will have total completed attempts > 0
-                    percent_total_problem_complete = sum(ifelse(total_completed_attempts > 0, 1, 0))/num_problems * 100,
-                    # sum of total hints requested
-                    num_hints = sum(total_hints),
-                    # sum of total attempts
-                    num_attempts = sum(total_num_attempts),
-                    # if a problem is completed it is assumed to be correct, regardless of number of attempts
-                    num_completed = sum(ifelse(total_completed_attempts > 0, 1, 0)),
-                    # sum of total time for tasks
-                    sum_time_task = sum(end_time - start_time),
-                    avg_time_task = sum_time_task/num_problems,
-                    num_resets = sum(total_resets),
-                    num_replays = sum(total_replay),
-                    num_problem_error = sum(ifelse(total_errors > 0, 1, 0)),
-                    percent_first_attempt_clover = sum(first_clovers, na.rm = TRUE)/(num_problems * 3) * 100, #each problem has max 3 clovers, counting NA values as 0.
-                    percent_best_attempt_clover = sum(best_clovers,  na.rm = TRUE)/(num_problems * 3) * 100,
-                    percent_final_attempt_clover = sum(final_clovers,  na.rm = TRUE)/(num_problems * 3) * 100
-                )
+    dplyr::summarize(
+        # Total number of rows in a group
+        num_problems = n(), 
+        # If a problem has been completed, it will have total completed attempts > 0
+        percent_total_problem_complete = sum(ifelse(total_completed_attempts > 0, 1, 0))/num_problems * 100,
+        # sum of total hints requested
+        num_hints = sum(total_hints),
+        # sum of total attempts
+        num_attempts = sum(total_num_attempts),
+        # if a problem is completed it is assumed to be correct, regardless of number of attempts
+        num_completed = sum(ifelse(total_completed_attempts > 0, 1, 0)),
+        # sum of total time for tasks
+        sum_time_task = sum(end_time - start_time),
+        avg_time_task = sum_time_task/num_problems,
+        num_resets = sum(total_resets),
+        num_replays = sum(total_replay),
+        num_problem_error = sum(ifelse(total_errors > 0, 1, 0)),
+        # Keeping the next three for now
+        percent_first_attempt_clover = sum(first_clovers, na.rm = TRUE)/(num_problems * 3) * 100, #each problem has max 3 clovers, counting NA values as 0.
+        percent_best_attempt_clover = sum(best_clovers,  na.rm = TRUE)/(num_problems * 3) * 100,
+        percent_final_attempt_clover = sum(final_clovers,  na.rm = TRUE)/(num_problems * 3) * 100,
+        # Added clover info kirk wanted
+        percent_one_clover_first = sum(ifelse(first_clovers == 1, 1, 0), na.rm = TRUE)/num_problems * 100,
+        percent_two_clover_first = sum(ifelse(first_clovers == 2, 1, 0), na.rm = TRUE)/num_problems * 100,
+        percent_three_clover_first = sum(ifelse(first_clovers == 3, 1, 0), na.rm = TRUE)/num_problems * 100,
+        percent_one_clover_best = sum(ifelse(best_clovers == 1, 1, 0), na.rm = TRUE)/num_problems * 100,
+        percent_two_clover_best = sum(ifelse(best_clovers == 2, 1, 0), na.rm = TRUE)/num_problems * 100,
+        percent_three_clover_best = sum(ifelse(best_clovers == 3, 1, 0), na.rm = TRUE)/num_problems * 100,
+    )
 
 ###### SAVE fh2t_student FILE #######
 write.csv(student_level , "ies_research schema/fh2t_student.csv")
