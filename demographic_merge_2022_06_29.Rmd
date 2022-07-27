@@ -302,6 +302,10 @@ df$INP_VIR <- ifelse(df$movement == 'INPERSON_VIRTUAL', 1, 0)
 df$stay_VIRTUAL <- ifelse(df$movement == 'VIRTUAL', 1, 0)
 df$VIR_INP <- ifelse(df$movement == 'VIRTUAL_INPERSON', 1, 0)
 
+# gender
+df$FEMALE <- ifelse(df$Gender == 'F', 1, 0)
+df$MALE <- ifelse(df$Gender == 'M', 1, 0)
+
 ```
 
 
