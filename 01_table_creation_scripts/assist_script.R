@@ -51,7 +51,7 @@ options(digits.secs = 3)
 
 ### Connect to SQLite DB ####
 # set db path
-ies_research_con <- dbConnect(RSQLite::SQLite(), "ies_research schema/maple_ies_research.db")
+ies_research_con<- dbConnect(RSQLite::SQLite(), "ies_research schema/maple_ies_research.db")
 
 
 #### load crosswalk #####
@@ -107,6 +107,47 @@ assignments <- data.frame (assignment_seq  = c(2,
 )
 
 
+##### add condition meta data
+condition <- data.frame (condition  = c("Instant",
+                                          "Instant",
+                                          "Instant",
+                                          "Instant",
+                                          "Instant",
+                                          "Instant",
+                                          "Instant",
+                                          "Instant",
+                                          "Instant",
+                                               
+                                           "Delay",
+                                          "Delay",
+                                          "Delay",
+                                          "Delay",
+                                          "Delay",
+                                          "Delay",
+                                          "Delay",
+                                          "Delay",
+                                          "Delay" ), 
+                           problem_set_id = c('PSABBP68',
+                                              'PSABBMRV',
+                                              'PSABBM2W',
+                                              'PSABBMSN',
+                                              'PSABBQZP',
+                                              'PSABCFQ7',
+                                              'PSABBMFD',
+                                              'PSABCFRE',
+                                              'PSABBRBK',
+                                              
+                                              'PSABC6S4',
+                                              'PSABC6ST',
+                                              'PSABC6SU',
+                                              'PSABC6SV',
+                                              'PSABC6SW',
+                                              'PSABC6SX',
+                                              'PSABC6SY',
+                                              'PSABC6SZ',
+                                              'PSABC6S2')
+)
+
 
 meta_cl <- meta %>%
   rename_all(funs(tolower(stringr::str_replace_all(.,'[.]', '_')))) %>% # clean variable names
@@ -119,6 +160,10 @@ meta_cl <- meta %>%
   left_join(
     assignments,
     by = "assignment_seq"
+  ) %>%
+  left_join(
+    condition,
+    by = "problem_set_id"
   ) %>%
   mutate(
     problem_part = ifelse(subproblem == "A" | is.na(subproblem), 1,
@@ -136,6 +181,7 @@ meta_cl <- meta %>%
     graded = ifelse(math_problem == 1 & response_type != "ungraded open response", 1, 0)
     
   ) %>% select(
+    condition,
     problem_set_id,
     assignment_seq,
     problem_id,
@@ -158,6 +204,7 @@ meta_cl <- meta %>%
   arrange(assignment_seq, problem_order, problem_part)
 
 table(is.na(meta_cl$problem_set_id))
+table(is.na(meta_cl$condition))
 
 
 # check missingness pattern
@@ -168,17 +215,41 @@ sapply(meta_cl, anyNA)
 write.csv(meta, "ies_research schema/assist_problems_meta.csv")
 
 ###### Write fh2t_problems_meta table ######
-if (dbExistsTable(ies_research_con, "assist_problems_meta"))
-  dbRemoveTable(ies_research_con, "assist_problems_meta")
+# if (dbExistsTable(ies_research_con, "assist_problems_meta"))
+#   dbRemoveTable(ies_research_con, "assist_problems_meta")
 RSQLite::dbWriteTable(ies_research_con, "assist_problems_meta", meta_cl, overwrite = T)
 
 #### assist_raw_logs ####
 
 ##### load data ####
-logs<-read.csv("02_data_source_files/ASSISTments_IES Study Data 7-13-2022_from Jack/Assignment Actions.csv", 
-               na.strings = c("", "NULL"))
+logs<-read.csv("02_data_source_files/ASSISTments_IES Study Data 7-13-2022_from Jack/Assignment Actions with not split data.csv", 
+               na.strings = c("", "NULL")) 
+  # not that this 
 colnames(logs)
 length(unique(logs$problem_id))
+
+# the response has NAs when 
+table(logs$action)
+table(grepl("response",logs$action), logs$action)
+table(grepl("response",logs$action), is.na(logs$submitted_response))
+  # missing responses when the action was a response
+
+#### code that Sid wrote to fix this problem
+# After some examination it seems like the the reason for this error was because of -ve answers submitted by kids.
+# I.E all rows with Submitted_response == "", is rows where the student had a negative answer, the - sign messed with the code it seems.
+
+# The response is always in the 4th position of the action array
+get_submitted_res <- function(check_action) {
+  action_ar <- unlist(strsplit(check_action, " - "))
+  return(trimws(action_ar[4]))
+}
+logs <- logs %>%
+  mutate(
+    submitted_response = sapply(check_action,get_submitted_res)
+  )
+table(grepl("response",logs$action), is.na(logs$submitted_response))
+
+
 
 ##### switch student ids ####
 logs <- logs %>%
@@ -191,14 +262,14 @@ logs <- logs %>%
 
 
 ##### SAVE assist_raw_logs.csv FILE ####
-write.csv(meta, "ies_research schema/assist_raw_logs.csv")
+write.csv(logs, "ies_research schema/assist_raw_logs.csv")
 
 ##### Write assist_raw_logs table ######
 if (dbExistsTable(ies_research_con, "assist_raw_logs"))
   dbRemoveTable(ies_research_con, "assist_raw_logs")
-RSQLite::dbWriteTable(ies_research_con, "assist_raw_logs", meta, overwrite = T)
+RSQLite::dbWriteTable(ies_research_con, "assist_raw_logs", logs, overwrite = T)
 
-#### assist_problem_action_logs ####
+#### assist_action_logs ####
 
 
     ##### MISSING STUDENTS IDS ####
@@ -316,16 +387,16 @@ sapply(logs_cln, anyNA)
 table(logs_cln$action, is.na(logs_cln$submitted_response))
 
 
-##### SAVE assist_problem_action_logs.csv FILE ####
-write.csv(meta, "ies_research schema/fh2t_student_action_logs.csv")
+##### SAVE assist_action_logs.csv FILE ####
+write.csv(logs_cln, "ies_research schema/assist_student_action_logs.csv")
 
-##### Write assist_problem_action_logs table ######
-if (dbExistsTable(ies_research_con, "fh2t_student_action_logs"))
-  dbRemoveTable(ies_research_con, "fh2t_student_action_logs")
-RSQLite::dbWriteTable(ies_research_con, "fh2t_student_action_logs", logs_cln, overwrite = T)
+##### Write assist_action_logs table ######
+if (dbExistsTable(ies_research_con, "assist_student_action_logs"))
+  dbRemoveTable(ies_research_con, "assist_student_action_logs")
+RSQLite::dbWriteTable(ies_research_con, "assist_student_action_logs", logs_cln, overwrite = T)
 
 
-#### assist_problem_action_logs ####
+#### assist_student_problem ####
 
 ##### load ####
 problems <- read.csv("02_data_source_files/ASSISTments_IES Study Data 7-13-2022_from Jack/Problem Logs.csv", 
@@ -377,7 +448,6 @@ problems_cln <- problems%>%
                             math_problem,
                             problem_type,
                             response_type,
-                            num_hints_meta = hints ,
                             response_type,
                             graded),
             by = c("problem_set_id", "problem_id", "problem_part")
@@ -550,7 +620,7 @@ table(assist_student_problem$answer_given, assist_student_problem$bottom_out_hin
 table(assist_student_problem$answer_given, assist_student_problem$bottom_out_hint, (assist_student_problem$num_resumes > 0))
 # will make bottom out hint an binary indicator
 
-# recognizing to only include variables we want 
+# reorg to only include variables we want 
 assist_student_problem <- assist_student_problem %>%
   mutate(
     correct = ifelse(graded == 0, NA, correct),
@@ -559,7 +629,8 @@ assist_student_problem <- assist_student_problem %>%
                    attempt_count == 0, 1, 0),
     correct_response_any = ifelse(correct_response_any >= 1, 1, 0),
     
-    bottom_out_hint = ifelse(bottom_out_hint > 0, 1, 0)
+    bottom_out_hint = ifelse(bottom_out_hint > 0, 1, 0),
+    total_time = difftime( as_datetime(end_time), as_datetime(start_time),  units = "secs")
   ) %>%
   select(
     StuID,
@@ -568,6 +639,7 @@ assist_student_problem <- assist_student_problem %>%
     problem_part,
     start_time,
     end_time,
+    total_time,
     first_response_time,
     assistments_correctness = correct,
     correct_response_first_attempt_before_hint,
@@ -583,18 +655,25 @@ assist_student_problem <- assist_student_problem %>%
     bottom_out_hint,
     flag
   ) 
+
+summary(as.numeric(assist_student_problem$total_time))
+table(is.na(assist_student_problem$total_time), assist_student_problem$num_attempts)
+
+
 table(assist_student_problem$correct_response_any, assist_student_problem$num_attempts)
-
 table(assist_student_problem$problem_id, is.na(assist_student_problem$problem_type)) 
-  # missing meta data for PRABKHMM
+# missing meta data for PRABKHMM  --> it is an end 
 
-##### SAVE assist_problem_action_logs.csv FILE ####
-write.csv(meta, "ies_research schema/assist_problem_action_logs.csv")
+
+
+
+##### SAVE assist_student_problem.csv FILE ####
+write.csv(assist_student_problem, "ies_research schema/assist_student_problem.csv")
 
 ##### Write assist_problem_action_logs table ######
-if (dbExistsTable(ies_research_con, "assist_problem_action_logs"))
-  dbRemoveTable(ies_research_con, "assist_problem_action_logs")
-RSQLite::dbWriteTable(ies_research_con, "assist_problem_action_logs", problems_cln, overwrite = T)
+if (dbExistsTable(ies_research_con, "assist_student_problem"))
+  dbRemoveTable(ies_research_con, "assist_student_problem")
+RSQLite::dbWriteTable(ies_research_con, "assist_student_problem", assist_student_problem, overwrite = T)
 
 
 ### assist_student ####
@@ -650,11 +729,13 @@ assist_student <- assist_student_problem %>%
     # graded problems
     num_graded_problems_started = sum(ifelse(problem_part == 1 & graded == 1, 1, 0)),
     num_graded_problems_attempted = sum(ifelse(num_attempts >= 1 & problem_part == 1 & graded == 1, 1, 0)),
-
+    per_graded_problems_attempted = num_graded_problems_attempted/218, # i'm not sure this the right denominator
+    
     # graded problem parts 
     num_graded_problem_parts_started = sum(graded),
     num_graded_problem_parts_attempted = sum(ifelse(graded== 1 & num_attempts >= 1, 1, 0)),
-
+    per_graded_problem_parts_attempted = num_graded_problem_parts_attempted/308, # i'm not sure this the right denominator
+    
     # correctness
     num_correct_response_first_attempt_before_hint = sum(correct_response_first_attempt_before_hint, na.rm = T),
     num_correct_response_first_attempt_after_hint = sum(correct_response_first_attempt_after_hint, na.rm = T),
@@ -668,13 +749,138 @@ assist_student <- assist_student_problem %>%
     avg_correct_response_any = ifelse(num_graded_problem_parts_attempted == 0, NA, 
                                       round(num_correct_response_any/num_graded_problem_parts_attempted, 2)),
     
+    # support
+    num_hints_accessed = sum(hint_count, na.rm = T),
+    num_problem_parts_hints_accessed = sum(ifelse(hint_count >= 1, 1, 0), na.rm = T),
+    per_available_hints_accessed = num_hints_accessed/sum(num_hints_available),
+    num_problems_parts_used_bottom_out_hint = sum(ifelse(bottom_out_hint >= 1, 1, 0), na.rm = T),
     
-    num_problems_parts_used_bottom_out_hint = sum(ifelse(bottom_out_hint >= 1, 1, 0), na.rm = T)
-    
+    # time 
+    avg_first_response_time = mean(first_response_time, na.rm = T),
+    avg_problem_time = mean(difftime( as_datetime(end_time), as_datetime(start_time),  units = "secs"), na.rm = T)*1000
     )
 
+length(unique(meta_cl[meta_cl$grade == 1,]$problem_id))
+length(unique(paste(meta_cl$problem_id, meta_cl$problem_part, sep = "_")))
+length(unique(paste(meta_cl[meta_cl$grade == 1,]$problem_id, meta_cl[meta_cl$grade == 1,]$problem_part, sep = "_")))
 
+# how many graded problems  are there in each condition --> 218
+length(unique(meta_cl[
+                        meta_cl$condition == "Instant"
+                      ,]$problem_id))
+
+length(unique(meta_cl[meta_cl$grade == 1 &
+                        meta_cl$condition == "Delay"
+                      ,]$problem_id))
+
+# how many graded problems  are there in each condition --> 218
+length(unique(meta_cl[meta_cl$grade == 1 &
+                              meta_cl$condition == "Instant"
+                            ,]$problem_id))
+
+length(unique(meta_cl[meta_cl$grade == 1 &
+                        meta_cl$condition == "Delay"
+                      ,]$problem_id))
+
+
+# how many graded problem parts are there in each condition --> 308
+length(unique(paste(meta_cl[meta_cl$grade == 1 &
+                              meta_cl$condition == "Instant"
+                            ,]$problem_id,
+                    meta_cl[meta_cl$grade == 1 &
+                              meta_cl$condition == "Instant"
+                            ,]$problem_part, sep = "_")))
+
+length(unique(paste(meta_cl[meta_cl$grade == 1 &
+                              meta_cl$condition == "Delay"
+                            ,]$problem_id,
+                    meta_cl[meta_cl$grade == 1 &
+                              meta_cl$condition == "Delay"
+                            ,]$problem_part, sep = "_")))
+
+
+#### data checks #####
+
+# problems
+summary(assist_student$num_problems_started)
+hist(assist_student$num_problems_started)
+summary(assist_student$num_problems_attempted)
+table(assist_student$num_problems_started >= assist_student$num_problems_attempted)
+
+
+
+# problem parts
+summary(assist_student$num_problem_parts_started )
+summary(assist_student$num_problem_parts_attempted)
+
+# graded problems
+summary(assist_student$num_graded_problems_started)
+summary(assist_student$num_graded_problems_attempted)
 table(assist_student$num_graded_problems_started >= assist_student$num_graded_problems_attempted)
+
+summary(assist_student$per_graded_problems_attempted)
+hist(assist_student$per_graded_problem_parts_attempted)
+
+
+# graded problem parts 
+summary(assist_student$num_graded_problem_parts_started)
+hist(assist_student$num_graded_problem_parts_started)
+summary(assist_student$num_graded_problem_parts_attempted)
+hist(assist_student$num_graded_problem_parts_attempted)
+
+summary(assist_student$per_graded_problem_parts_attempted)
+
+# correctness
+summary(assist_student$num_correct_response_first_attempt_before_hint)
+summary(assist_student$num_correct_response_first_attempt_after_hint)
+summary(assist_student$num_correct_response_any)
+
+table(assist_student$num_correct_response_first_attempt_before_hint <= assist_student$num_correct_response_first_attempt_after_hint)
+table(assist_student$num_correct_response_first_attempt_after_hint <= assist_student$num_correct_response_any)
+
+hist(assist_student$num_correct_response_first_attempt_before_hint)
+hist(assist_student$num_correct_response_first_attempt_after_hint)
+hist(assist_student$num_correct_response_any)
+
+
+#
+summary(assist_student$avg_accuracy_first_attempt_before_hint)
+        summary(assist_student$avg_accuracy_first_attempt_after_hint)
+                summary(assist_student$avg_correct_response_any)
+
+table(is.na(assist_student$avg_accuracy_first_attempt_before_hint), assist_student$num_problem_parts_attempted == 0)
+
+
+                # support
+summary(assist_student$num_hints_accessed)
+summary(assist_student$num_problem_parts_hints_accessed)
+summary(assist_student$per_available_hints_accessed)
+summary(assist_student$num_problems_parts_used_bottom_out_hint)       
+hist(assist_student$num_problems_parts_used_bottom_out_hint)
+
+
+# time 
+summary(assist_student$avg_first_response_time)
+table(is.na(assist_student$avg_first_response_time), (assist_student$num_problem_parts_attempted == 0))
+hist(as.numeric(assist_student$avg_first_response_time)/60000, breaks = 100000, xlim =c(0, 5))
+
+  summary(as.numeric(assist_student$avg_problem_time))
+  table(is.na(assist_student$avg_problem_time), (assist_student$num_problem_parts_attempted == 0))
+  hist(as.numeric(assist_student$avg_problem_time)/60000, breaks = 100000, xlim =c(0, 5))
+  
+  table(as.numeric(assist_student$avg_first_response_time) <= as.numeric(assist_student$avg_problem_time))
+  
+plot(as.numeric(assist_student$avg_problem_time)/60000, )
+  
+  
+## SAVE assist_problem_action_logs.csv FILE ####
+write.csv(assist_student, "ies_research schema/assist_student.csv")
+
+##### Write assist_problem_action_logs table ######
+if (dbExistsTable(ies_research_con, "assist_student"))
+  dbRemoveTable(ies_research_con, "assist_student")
+RSQLite::dbWriteTable(ies_research_con, "assist_student", assist_student, overwrite = T)
+
 
 # num problems correct* should always be > or = to total problem parts attempted
 
@@ -696,11 +902,4 @@ summary(assist_student$avg_correct_response_any)
 hist(assist_student$avg_correct_response_any, breaks = 100)
 
 
-
-#### assignment level data ####
-##### load ####
-assign <- read.csv("02_data_source_files/ASSISTments_IES Study Data 7-13-2022_from Jack/study_assignment_logs.csv", 
-                   na.strings = c(""))
-colnames(assign)
-lapply(assign, "check")
 
