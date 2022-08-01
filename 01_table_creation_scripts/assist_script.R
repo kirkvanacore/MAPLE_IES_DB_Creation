@@ -718,42 +718,42 @@ assist_student <- assist_student_problem %>%
     num_assignments_started = length(unique(problem_set_id)),
     
     # problems
-    num_problems_started = length(unique(paste(problem_set_id, problem_id))),
-    num_problems_attempted = sum(complete_problem_flag),
+    total_problems_started = length(unique(paste(problem_set_id, problem_id))),
+    total_problems_attempted = sum(complete_problem_flag),
     
     
     # problem parts
-    num_problem_parts_started = length(unique(problem_id_part)),
-    num_problem_parts_attempted =sum(ifelse(num_attempts >= 1, 1, 0)),
+    total_problem_parts_started = length(unique(problem_id_part)),
+    total_problem_parts_attempted =sum(ifelse(total_attempts >= 1, 1, 0)),
 
     # graded problems
-    num_graded_problems_started = sum(ifelse(problem_part == 1 & graded == 1, 1, 0)),
-    num_graded_problems_attempted = sum(ifelse(num_attempts >= 1 & problem_part == 1 & graded == 1, 1, 0)),
-    per_graded_problems_attempted = num_graded_problems_attempted/218, # i'm not sure this the right denominator
+    total_graded_problems_started = sum(ifelse(problem_part == 1 & graded == 1, 1, 0)),
+    total_graded_problems_attempted = sum(ifelse(total_attempts >= 1 & problem_part == 1 & graded == 1, 1, 0)),
+    per_graded_problems_attempted = total_graded_problems_attempted/218, # i'm not sure this the right denominator
     
     # graded problem parts 
-    num_graded_problem_parts_started = sum(graded),
-    num_graded_problem_parts_attempted = sum(ifelse(graded== 1 & num_attempts >= 1, 1, 0)),
-    per_graded_problem_parts_attempted = num_graded_problem_parts_attempted/308, # i'm not sure this the right denominator
+    total_graded_problem_parts_started = sum(graded),
+    total_graded_problem_parts_attempted = sum(ifelse(graded== 1 & total_attempts >= 1, 1, 0)),
+    per_graded_problem_parts_attempted = total_graded_problem_parts_attempted/308, # i'm not sure this the right denominator
     
     # correctness
-    num_correct_response_first_attempt_before_hint = sum(correct_response_first_attempt_before_hint, na.rm = T),
-    num_correct_response_first_attempt_after_hint = sum(correct_response_first_attempt_after_hint, na.rm = T),
-    num_correct_response_any = sum(correct_response_any, na.rm = T),
+    total_correct_response_first_attempt_before_hint = sum(correct_response_first_attempt_before_hint, na.rm = T),
+    total_correct_response_first_attempt_after_hint = sum(correct_response_first_attempt_after_hint, na.rm = T),
+    total_correct_response_any = sum(correct_response_any, na.rm = T),
     
     #
-    avg_accuracy_first_attempt_before_hint = ifelse(num_graded_problem_parts_attempted == 0, NA,
-                                                    round(num_correct_response_first_attempt_before_hint/num_graded_problem_parts_attempted, 2)),
-    avg_accuracy_first_attempt_after_hint = ifelse(num_graded_problem_parts_attempted == 0, NA, 
-                                                   round(num_correct_response_first_attempt_after_hint/num_graded_problem_parts_attempted, 2)),
-    avg_correct_response_any = ifelse(num_graded_problem_parts_attempted == 0, NA, 
-                                      round(num_correct_response_any/num_graded_problem_parts_attempted, 2)),
+    avg_accuracy_first_attempt_before_hint = ifelse(total_graded_problem_parts_attempted == 0, NA,
+                                                    round(total_correct_response_first_attempt_before_hint/total_graded_problem_parts_attempted, 2)),
+    avg_accuracy_first_attempt_after_hint = ifelse(total_graded_problem_parts_attempted == 0, NA, 
+                                                   round(total_correct_response_first_attempt_after_hint/total_graded_problem_parts_attempted, 2)),
+    avg_correct_response_any = ifelse(total_graded_problem_parts_attempted == 0, NA, 
+                                      round(total_correct_response_any/total_graded_problem_parts_attempted, 2)),
     
     # support
-    num_hints_accessed = sum(hint_count, na.rm = T),
-    num_problem_parts_hints_accessed = sum(ifelse(hint_count >= 1, 1, 0), na.rm = T),
-    per_available_hints_accessed = num_hints_accessed/sum(num_hints_available),
-    num_problems_parts_used_bottom_out_hint = sum(ifelse(bottom_out_hint >= 1, 1, 0), na.rm = T),
+    total_hints_accessed = sum(hint_count, na.rm = T),
+    total_problem_parts_hints_accessed = sum(ifelse(hint_count >= 1, 1, 0), na.rm = T),
+    per_available_hints_accessed = total_hints_accessed/sum(total_hints_available),
+    total_problems_parts_used_bottom_out_hint = sum(ifelse(bottom_out_hint >= 1, 1, 0), na.rm = T),
     
     # time 
     avg_first_response_time = mean(first_response_time, na.rm = T),
