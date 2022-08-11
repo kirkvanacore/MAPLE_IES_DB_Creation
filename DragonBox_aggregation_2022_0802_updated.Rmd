@@ -199,13 +199,15 @@ db_problem_level <- final_roster_DB %>%
 
 
 ```{r}
-
-
+db_problem_level <- db_problem_level %>% select(-'student_id', -'02_07_p',-'02_08_p',-'03_05_p',-'03_07_p',-'04_05_p', -'04_06_p', -'05_05_p', -'05_06_p', -'07_05_p', -'07_06_p',
+-'08_05_p', -'08_06_p', -'09_05_p', -'09_06_p', -'10_05_p', -'10_06_p',
+-'10_05_p', -'10_06_p', -'Device Number', -'Notes')
 ```
+
 
 # Export data files 
 ```{r}
-write_xlsx(x = db_problem_level, path = "DB_aggregation_merge_2022_0628.xlsx", col_names = TRUE)
+write_xlsx(x = db_problem_level, path = "DB_aggregation_merge_2022_0802.xlsx", col_names = TRUE)
 ```
 
 
