@@ -418,7 +418,7 @@ problems <- problems%>%
     !problem_id %in% missing_porblme_logs$problem_id # check this --> dropped a lot
   ) %>%
   dplyr::mutate(
-    dup = duplicated( paste(experiment_id, student_id, problem_id, problem_part, start_time)),
+    dup = duplicated( paste(experiment_id, student_id, problem_id, problem_part, start_time))
   ) 
 
 
@@ -450,7 +450,7 @@ problems_cln <- problems%>%
                             response_type,
                             response_type,
                             graded),
-            by = c("problem_set_id", "problem_id", "problem_part")
+            by = c("problem_set_id", "problem_id", "problem_part") 
   ) 
   # the NAs in the meta data are due to missing data in the original file, but it is only for 
   
@@ -520,24 +520,38 @@ range(problems$start_time)
 
 
 
-# merge aggriation for logs with problem data provided by assignments
-assist_student_problem <- problems_cln %>%
-  left_join(
-    problem_logs_agg %>%
-      mutate(
-        FLAG = 1
-      ),
+# merge aggravation for logs with problem data provided by assignments
+assist_student_problem <- (problems_cln) %>% 
+  dplyr::mutate(
+    total_time = ifelse(
+      as.numeric(difftime( as_datetime(end_time), as_datetime(start_time),  units = "secs"))/(360) > 1, NA, # if the time is greater than an hour NULL
+      as.numeric(difftime( as_datetime(end_time), as_datetime(start_time),  units = "secs")))*1000,
+    first_response_time = ifelse(first_response_time/(3.6e+6) > 1, NA, first_response_time)
+    )  %>%
+  dplyr::left_join(
+    (problem_logs_agg),
     by = c("StuID", 
            "problem_set_id",
            "problem_id",
            "problem_part")
   ) 
 
-table(is.na(assist_student_problem$FLAG))
 table(is.na(assist_student_problem$student_id))
 
 
+colnames(assist_student_problem)
 
+### check total time ####
+describe(as.numeric( (assist_student_problem$total_time/6000))) # in mins
+table(round(as.numeric((assist_student_problem$total_time/(3.6e+6))), 0)) # none over an hour
+table(round(as.numeric((assist_student_problem$total_time/(6000))), 0) > 30) 
+hist((as.numeric((assist_student_problem$total_time/(6000)))), breaks = 1000, xlim = c(0, 20))
+
+### check first response time ####
+describe(as.numeric( (assist_student_problem$first_response_time/6000))) # in mins
+table(round(as.numeric((assist_student_problem$first_response_time/(3.6e+6))), 3)) # none over an hour
+table(round(as.numeric((assist_student_problem$first_response_time/(6000))), 0) > 30) 
+hist((as.numeric((assist_student_problem$first_response_time/(6000)))), breaks = 10000, xlim = c(0, 20))
 
 ##### Check Aggregations ####
 
@@ -612,8 +626,6 @@ check <- assist_student_problem %>%
   filter(is.na(correct) == F,
          attempt_count == 0 )
 
-
-
 # bottom out hints
 table(assist_student_problem$answer_given, assist_student_problem$bottom_out_hint)
   # answer given aligns with bottom out hints
@@ -623,20 +635,22 @@ table(assist_student_problem$answer_given, assist_student_problem$bottom_out_hin
 # reorg to only include variables we want 
 assist_student_problem <- assist_student_problem %>%
   mutate(
-    correct = ifelse(graded == 0, NA, correct),
     flag = ifelse(is.na(correct_response_any) &
                    is.na(correct) == F &
                    attempt_count == 0, 1, 0),
+    correct = ifelse(graded == 0 | flag == 1, NA, correct),
     correct_response_any = ifelse(correct_response_any >= 1, 1, 0),
     
-    bottom_out_hint = ifelse(bottom_out_hint > 0, 1, 0),
-    total_time = difftime( as_datetime(end_time), as_datetime(start_time),  units = "secs")
+    bottom_out_hint = ifelse(bottom_out_hint > 0, 1, 0)
   ) %>%
   select(
     StuID,
+    assistments_reference_id,
     problem_set_id,
     problem_id,
     problem_part,
+    problem_type,
+    graded,
     start_time,
     end_time,
     total_time,
@@ -647,14 +661,11 @@ assist_student_problem <- assist_student_problem %>%
     correct_response_any,
     hint_count,
     num_hints_available,
-    assistments_reference_id,
-    problem_type,
-    graded,
     num_attempts = attempt_num_max,
     num_resumes,
-    bottom_out_hint,
-    flag
+    bottom_out_hint
   ) 
+
 
 summary(as.numeric(assist_student_problem$total_time))
 table(is.na(assist_student_problem$total_time), assist_student_problem$num_attempts)
@@ -718,46 +729,47 @@ assist_student <- assist_student_problem %>%
     num_assignments_started = length(unique(problem_set_id)),
     
     # problems
-    total_problems_started = length(unique(paste(problem_set_id, problem_id))),
-    total_problems_attempted = sum(complete_problem_flag),
+    num_problems_started = length(unique(paste(problem_set_id, problem_id))),
+    num_problems_attempted = sum(complete_problem_flag),
     
     
     # problem parts
-    total_problem_parts_started = length(unique(problem_id_part)),
-    total_problem_parts_attempted =sum(ifelse(total_attempts >= 1, 1, 0)),
+    num_problem_parts_started = length(unique(problem_id_part)),
+    num_problem_parts_attempted =sum(ifelse(num_attempts >= 1, 1, 0)),
 
     # graded problems
-    total_graded_problems_started = sum(ifelse(problem_part == 1 & graded == 1, 1, 0)),
-    total_graded_problems_attempted = sum(ifelse(total_attempts >= 1 & problem_part == 1 & graded == 1, 1, 0)),
-    per_graded_problems_attempted = total_graded_problems_attempted/218, # i'm not sure this the right denominator
+    num_graded_problems_started = sum(ifelse(problem_part == 1 & graded == 1, 1, 0)),
+    num_graded_problems_attempted = sum(ifelse(num_attempts >= 1 & problem_part == 1 & graded == 1, 1, 0)),
+    per_graded_problems_attempted = num_graded_problems_attempted/218, # i'm not sure this the right denominator
     
     # graded problem parts 
-    total_graded_problem_parts_started = sum(graded),
-    total_graded_problem_parts_attempted = sum(ifelse(graded== 1 & total_attempts >= 1, 1, 0)),
-    per_graded_problem_parts_attempted = total_graded_problem_parts_attempted/308, # i'm not sure this the right denominator
+    num_graded_problem_parts_started = sum(graded),
+    num_graded_problem_parts_attempted = sum(ifelse(graded== 1 & num_attempts >= 1, 1, 0)),
+    per_graded_problem_parts_attempted = num_graded_problem_parts_attempted/308, # i'm not sure this the right denominator
     
     # correctness
-    total_correct_response_first_attempt_before_hint = sum(correct_response_first_attempt_before_hint, na.rm = T),
-    total_correct_response_first_attempt_after_hint = sum(correct_response_first_attempt_after_hint, na.rm = T),
-    total_correct_response_any = sum(correct_response_any, na.rm = T),
+    num_correct_response_first_attempt_before_hint = sum(correct_response_first_attempt_before_hint, na.rm = T),
+    num_correct_response_first_attempt_after_hint = sum(correct_response_first_attempt_after_hint, na.rm = T),
+    num_correct_response_any = sum(correct_response_any, na.rm = T),
     
     #
-    avg_accuracy_first_attempt_before_hint = ifelse(total_graded_problem_parts_attempted == 0, NA,
-                                                    round(total_correct_response_first_attempt_before_hint/total_graded_problem_parts_attempted, 2)),
-    avg_accuracy_first_attempt_after_hint = ifelse(total_graded_problem_parts_attempted == 0, NA, 
-                                                   round(total_correct_response_first_attempt_after_hint/total_graded_problem_parts_attempted, 2)),
-    avg_correct_response_any = ifelse(total_graded_problem_parts_attempted == 0, NA, 
-                                      round(total_correct_response_any/total_graded_problem_parts_attempted, 2)),
+    avg_accuracy_first_attempt_before_hint = ifelse(num_graded_problem_parts_attempted == 0, NA,
+                                                    round(num_correct_response_first_attempt_before_hint/num_graded_problem_parts_attempted, 2)),
+    avg_accuracy_first_attempt_after_hint = ifelse(num_graded_problem_parts_attempted == 0, NA, 
+                                                   round(num_correct_response_first_attempt_after_hint/num_graded_problem_parts_attempted, 2)),
+    avg_correct_response_any = ifelse(num_graded_problem_parts_attempted == 0, NA, 
+                                      round(num_correct_response_any/num_graded_problem_parts_attempted, 2)),
     
-    # support
+    # hints
     total_hints_accessed = sum(hint_count, na.rm = T),
-    total_problem_parts_hints_accessed = sum(ifelse(hint_count >= 1, 1, 0), na.rm = T),
-    per_available_hints_accessed = total_hints_accessed/sum(total_hints_available),
-    total_problems_parts_used_bottom_out_hint = sum(ifelse(bottom_out_hint >= 1, 1, 0), na.rm = T),
+    per_available_hints_accessed = total_hints_accessed/sum(num_hints_available),
+    num_problem_parts_hints_accessed = sum(ifelse(hint_count >= 1, 1, 0), na.rm = T),
+    num_problem_parts_used_bottom_out_hint = sum(ifelse(bottom_out_hint >= 1, 1, 0), na.rm = T),
     
     # time 
     avg_first_response_time = mean(first_response_time, na.rm = T),
-    avg_problem_time = mean(difftime( as_datetime(end_time), as_datetime(start_time),  units = "secs"), na.rm = T)*1000
+    avg_problem_time = mean(total_time, na.rm = T),
+    total_time = sum(total_time, na.rm = T)
     )
 
 length(unique(meta_cl[meta_cl$grade == 1,]$problem_id))
@@ -860,27 +872,24 @@ hist(assist_student$num_problems_parts_used_bottom_out_hint)
 
 
 # time 
-summary(assist_student$avg_first_response_time)
+summary(assist_student$avg_first_response_time/60000)
 table(is.na(assist_student$avg_first_response_time), (assist_student$num_problem_parts_attempted == 0))
 hist(as.numeric(assist_student$avg_first_response_time)/60000, breaks = 100000, xlim =c(0, 5))
 
   summary(as.numeric(assist_student$avg_problem_time))
   table(is.na(assist_student$avg_problem_time), (assist_student$num_problem_parts_attempted == 0))
-  hist(as.numeric(assist_student$avg_problem_time)/60000, breaks = 100000, xlim =c(0, 5))
+  hist(as.numeric(assist_student$avg_problem_time)/60000, breaks = 100, xlim =c(0, 5))
   
   table(as.numeric(assist_student$avg_first_response_time) <= as.numeric(assist_student$avg_problem_time))
   
-plot(as.numeric(assist_student$avg_problem_time)/60000, )
+hist(as.numeric(assist_student$avg_problem_time)/60000, breaks = 100000, xlim =c(0, 5))
+table(as.numeric(assist_student$avg_problem_time)/60000 > 24*60)
   
-  
-## SAVE assist_problem_action_logs.csv FILE ####
-write.csv(assist_student, "ies_research schema/assist_student.csv")
 
-##### Write assist_problem_action_logs table ######
-if (dbExistsTable(ies_research_con, "assist_student"))
-  dbRemoveTable(ies_research_con, "assist_student")
-RSQLite::dbWriteTable(ies_research_con, "assist_student", assist_student, overwrite = T)
-
+summary(assist_student$total_time/3600000)
+table(is.na(assist_student$avg_first_response_time), (assist_student$num_problem_parts_attempted == 0))
+hist(as.numeric(assist_student$total_time)/3600000, breaks = 1000, xlim =c(0, 5))
+plot(as.numeric(assist_student$total_time)/3600000, assist_student$num_assignments_started)
 
 # num problems correct* should always be > or = to total problem parts attempted
 
@@ -900,6 +909,14 @@ summary(assist_student$avg_accuracy_first_attempt_after_hint)
 hist(assist_student$avg_accuracy_first_attempt_after_hint, breaks = 100)
 summary(assist_student$avg_correct_response_any)
 hist(assist_student$avg_correct_response_any, breaks = 100)
+
+## SAVE assist_problem_action_logs.csv FILE ####
+write.csv(assist_student, "ies_research schema/assist_student.csv")
+
+##### Write assist_problem_action_logs table ######
+if (dbExistsTable(ies_research_con, "assist_student"))
+  dbRemoveTable(ies_research_con, "assist_student")
+RSQLite::dbWriteTable(ies_research_con, "assist_student", assist_student, overwrite = T)
 
 
 
