@@ -493,7 +493,7 @@ problem_logs_agg <- logs_cln %>%
     correct_response_first_attempt_before_hint = ifelse(graded == 0 | attempt_num_max == 0, NA, 
                                                        sum(ifelse(hint_num == 0 & attempt_num == 1 & action == "correct response", 1, 0)) ),
     correct_response_first_attempt_after_hint = ifelse(graded == 0 | attempt_num_max == 0, NA, 
-                                            sum(ifelse(attempt_num == 1 & action == "correct response", 1, 0)) ),
+                                            sum(ifelse(hint_num > 0 & attempt_num == 1 & action == "correct response", 1, 0)) ),
     correct_response_any = ifelse(graded == 0 | attempt_num_max == 0, NA, 
                                 ifelse(  sum(ifelse(action == "correct response", 1, 0)) > 0, 1, 0) ),
     bottom_out_hint = ifelse(
