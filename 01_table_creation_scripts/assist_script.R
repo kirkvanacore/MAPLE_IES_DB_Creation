@@ -740,7 +740,7 @@ assist_student <- assist_student_problem %>%
     # graded problems
     num_graded_problems_started = sum(ifelse(problem_part == 1 & graded == 1, 1, 0)),
     num_graded_problems_attempted = sum(ifelse(num_attempts >= 1 & problem_part == 1 & graded == 1, 1, 0)),
-    per_graded_problems_attempted = num_graded_problems_attempted/218, # i'm not sure this the right denominator
+    per_graded_problems_attempted = num_graded_problems_attempted/219, # i'm not sure this the right denominator
     
     # graded problem parts 
     num_graded_problem_parts_started = sum(graded),
