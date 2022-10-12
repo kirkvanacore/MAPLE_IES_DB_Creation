@@ -28,6 +28,9 @@ rm(package.check, packages)
 colClean <- function(x){ colnames(x) <- sub("[.]", "_", colnames(x)); x } 
 
 
+### Connect to SQLite DB ###
+ies_research_con <- dbConnect(RSQLite::SQLite(), "ies_research schema/maple_ies_research.db")
+
 # updates 
 - 
   # set global chunk options...  
@@ -72,6 +75,8 @@ rm(package.check, packages)
 panderOptions('digits', 3)
 panderOptions('round', 3)
 panderOptions('keep.trailing.zeros', TRUE)
+# get rid of "." because it messess with the queries
+colClean <- function(x){   colnames(x) = gsub("\\.", "_", colnames(x)); x } 
 
 
 
@@ -83,8 +88,10 @@ assessment_raw <- read.csv("02_data_source_files/ies_dataset_2021_0527.csv")
 final_roster <- read.csv("02_data_source_files/roster_demographic_2022_06_16_N=4,343.csv")
 # problem id
 assessmemt_problem_id <- read_excel("02_data_source_files/assessment_problem_id_forsyth_2020.xlsx")
-
-
+# demo data (has test scores)
+# load demo data
+demo<- read.csv('02_data_source_files/roster_demographic_2022_09_20_N=4,343 - Sheet1.csv', na.strings = c("#NULL!"))
+demo <- colClean(demo)
 
 ### cleaning the assessment raw file 
 
@@ -1272,8 +1279,18 @@ ies_aggregation_problem <- ies_aggregation[ ,!grepl("pre|mid.|post.|delayed.",
 # write.csv(x = ies_aggregation_problem, 
 #            path = "ies_assessment_aggregation_problem_20220629.xlsx", col_names = TRUE)
 
-
-
+## STUDENT LEVEL DATA #####
+##### add in state tests #####
+ies_aggregation_student <- ies_aggregation_student %>%
+  left_join(demo %>%
+              dplyr::select(
+                StuID,
+                Scale_Score5,
+                Scale_Score7,
+                Performance_Level5,
+                Performance_Level7,
+                math_grade7),
+            by = c("StuID"))
 
 
 
@@ -1281,23 +1298,34 @@ ifnull <- function(x,y) ifelse(is.na(x), y, x)
 options(scipen = 100)
 
 
-### Connect to SQLite DB ####
-ies_research_con <- dbConnect(RSQLite::SQLite(), "ies_research schema/maple_ies_research.db")
 
 
 ## load assessment data
-assess <- ies_aggregation_student
+assess <- colClean(ies_aggregation_student)
 colnames(assess)
+
 
 # get rid of '.' in colnames
-colnames(assess)<-sub('[.]', '_', colnames(assess))
 colnames(assess)
 
 
-### Save Crosswalk as csv
+### Save assess_student.csv as csv
 write.csv(assess, "ies_research schema/assess_student.csv")
 
-### Save crosswalk in maple_ies_research db
+### Save assess_student.csv in maple_ies_research db
 
 RSQLite::dbWriteTable(ies_research_con, "assess_student", assess, overwrite = T)
+
+
+## PROBLEM LEVEL DATA #####
+assess_problem <- colClean(ies_aggregation_problem)
+
+
+### Save assess_student.csv as csv
+write.csv(assess_problem, "ies_research schema/assess_problem.csv")
+
+### Save assess_student.csv in maple_ies_research db
+
+RSQLite::dbWriteTable(ies_research_con, "assess_problem", assess_problem, overwrite = T)
+
 

@@ -44,16 +44,16 @@ ies_research_con <- dbConnect(RSQLite::SQLite(), "ies_research schema/maple_ies_
 
 ## --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 # Student roster
-final_roster <- read_excel("roster_demographic_2022_06_16_N=4,343.xlsx")
+final_roster <- read.csv("02_data_source_files/roster_demographic_2022_06_16_N=4,343.csv")
 
 # Data from the ASSISTments database
-db_raw  <- read.csv("ies_dataset_2021_0527.csv")
+db_raw  <- read.csv("02_data_source_files/ies_dataset_2021_0527.csv") # cant find thsi
 
 # Problem list 
-db_problem_list <- read_excel("db_problem_list.xlsx")
+db_problem_list <- read_excel("02_data_source_files/db_problem_list.xlsx")
 
 # Data extracted from the DB devices
-device_data <- read_excel("DB_DeviceData.xlsx")
+device_data <- read_excel("02_data_source_files/DB_DeviceData.xlsx")
 
 
 ## --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------

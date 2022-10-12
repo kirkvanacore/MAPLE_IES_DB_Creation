@@ -1,64 +1,72 @@
----
-title: "DB_aggregation_2020_1113"
-author: "Jieun Lee"
-date: "11/13/2020"
-output: html_document
----
+# ---
+# title: "DB_aggregation_2020_1113"
+# author: "Jieun Lee"
+# date: "11/13/2020"
+# output: html_document
+# ---
+# 
+# # updates 
+# - 
 
-# updates 
-- 
-
-```{r global_options, include=FALSE}
-# set global chunk options...  
-knitr::opts_chunk$set(comment     = "",
-                      echo        = FALSE, 
-                      comment     = FALSE,
-                      warning     = FALSE, 
-                      message     = FALSE)
-```
-
-
-```{r, echo=FALSE, results=FALSE, warning=FALSE, message=FALSE}
 ### ----- load package(s) ----- ###
 
-library("tidyverse")    
-library("forcats")
-library("lubridate")    
-library("readxl")
-library("reshape2")
-library("data.table")
-library("dplyr")
-library("readr")
 
-library("psych")        
-library("furniture")    
-library("stargazer")    
-library("pander")
-library("writexl")
+
+####Installing & Loading Packages###
+#create list of packages
+packages = c(
+  
+  "tidyverse",    
+  "forcats",
+  "lubridate",    
+  "readxl",
+  "reshape2",
+  "data.table",
+  "dplyr",
+  "readr",
+  
+  "psych",        
+  "furniture",    
+  "stargazer",    
+  "pander",
+  "writexl"
+  
+)
+#load install
+package.check <- lapply(
+  packages,
+  FUN = function(x) {
+    if (!require(x, character.only = TRUE)) {
+      install.packages(x, dependencies = TRUE)
+      library(x, character.only = TRUE)
+    }
+  } 
+) 
+rm(package.check, packages)
+
 
 panderOptions('digits', 3)
 panderOptions('round', 3)
 panderOptions('keep.trailing.zeros', TRUE)
-```
+
 
 ### Reading in the data source files 
-```{r}
 # Student roster
-final_roster <- read_excel("roster_demographic_2022_06_16_N=4,343.xlsx")
+final_roster <- read.csv("02_data_source_files/roster_demographic_2022_06_16_N=4,343.csv")
 
 # Data from the ASSISTments database
-db_raw  <- read.csv("ies_dataset_2021_0527.csv")
+db_raw  <- read.csv("02_data_source_files/ies_dataset_2021_0527.csv")
 
 # Problem list 
-db_problem_list <- read_excel("db_problem_list.xlsx")
+db_problem_list <- read_excel("02_data_source_files/db_problem_list.xlsx")
 
 # Data extracted from the DB devices
-device_data <- read_excel("DB_DeviceData.xlsx")
-```
+device_data <- read_excel("02_data_source_files/DB_DeviceData.xlsx")
+
 
 
 ### cleaning the source files 
-```{r}
+
 # Selecting necessary columns in the roster data 
 final_roster <- final_roster %>% select('student_id', 'StuID', 'condition_assignment')
 
@@ -79,10 +87,10 @@ db_raw <- db_raw[ which(db_raw$condition=="DragonBox"), ]
 # Adding the problem number information to the raw data 
 db_raw <- inner_join(db_raw, db_problem_list, by = "question_id")
 db_raw <- db_raw %>% select(-"problem_id.y")
-```
+
 
 ##### subsetting the data
-```{r}
+
 ##### subsetting the data
 db_as2 <- db_raw[ which(db_raw$assignment=='DRGNBX_AS2'), ]
 db_as3 <- db_raw[ which(db_raw$assignment=='DRGNBX_AS3'), ]
@@ -93,11 +101,11 @@ db_as8 <- db_raw[ which(db_raw$assignment=='DRGNBX_AS8'), ]
 db_as9 <- db_raw[ which(db_raw$assignment=='DRGNBX_AS9'), ]
 db_as10 <- db_raw[ which(db_raw$assignment=='DRGNBX_AS10'), ]
 db_as11 <- db_raw[ which(db_raw$assignment=='DRGNBX_AS11'), ]
-```
+
 
 
 #### problem-level aggregation 
-```{r}
+
 ### assignment 2
 db_as2_answer <- dcast(db_as2, 
                       student_id ~ problem_n_02, 
@@ -180,10 +188,10 @@ db_as11_answer <- dcast(db_as11,
                       na.rm = TRUE)
 
 db_as11_answer <- db_as11_answer %>% select(-"11_04_inst",-"11_10_inst", ,-"11_16_inst") 
-```
+
 
 ##### Problem level summary 
-```{r}
+
 db_problem_level <- final_roster_DB %>%
   full_join(db_as2_answer, by = "student_id") %>%
   full_join(db_as3_answer, by = "student_id") %>%
@@ -195,20 +203,20 @@ db_problem_level <- final_roster_DB %>%
   full_join(db_as10_answer, by = "student_id") %>%
   full_join(db_as11_answer, by = "student_id") %>%
   full_join(device_data, by = "student_id")
-```
 
 
-```{r}
+
+
 db_problem_level <- db_problem_level %>% select(-'student_id', -'02_07_p',-'02_08_p',-'03_05_p',-'03_07_p',-'04_05_p', -'04_06_p', -'05_05_p', -'05_06_p', -'07_05_p', -'07_06_p',
 -'08_05_p', -'08_06_p', -'09_05_p', -'09_06_p', -'10_05_p', -'10_06_p',
 -'10_05_p', -'10_06_p', -'Device Number', -'Notes')
-```
+
 
 
 # Export data files 
-```{r}
-write_xlsx(x = db_problem_level, path = "DB_aggregation_merge_2022_0802.xlsx", col_names = TRUE)
-```
+
+write.csv(x = db_problem_level, path = "ies_research schema/dragon_student.csv", col_names = TRUE)
+
 
 
 
